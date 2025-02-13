@@ -1,0 +1,11 @@
+@import url("@fontsource/pretendard/400.css");
+@import url("@fontsource/pretendard/700.css");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: "Pretendard", sans-serif; /* 기본 폰트 설정 */
+  }
+}
