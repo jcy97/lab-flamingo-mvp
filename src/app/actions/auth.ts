@@ -21,7 +21,7 @@ export const authenticate = async (
       password: formData.get("password"),
       redirect: true,
     });
-    return redirect("/dashboard");
+    return redirect("/dashboard/project");
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {

@@ -76,7 +76,7 @@ export const authConfig = {
   adapter: PrismaAdapter(db),
   callbacks: {
     async redirect({ url, baseUrl }) {
-      return "/dashboard";
+      return "/dashboard/project";
     },
     session: ({ session, token }) => ({
       ...session,

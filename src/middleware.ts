@@ -7,6 +7,7 @@ export default auth((req) => {
   const isLoginPage = req.nextUrl.pathname === "/signin";
   const isRegisterPage = req.nextUrl.pathname === "/register";
   const isRootPage = req.nextUrl.pathname === "/";
+  const isDashboardPage = req.nextUrl.pathname.startsWith("/dashboard");
 
   if (!isAuthenticated) {
     // 비인증 상태일 때:
@@ -21,7 +22,13 @@ export default auth((req) => {
     // 인증된 상태일 때:
     // 로그인, 회원가입, 루트 페이지 접근 시 대시보드로 리디렉트
     if (isLoginPage || isRegisterPage || isRootPage) {
-      const newUrl = new URL("/dashboard", req.nextUrl.origin);
+      const newUrl = new URL("/dashboard/project", req.nextUrl.origin);
+      return Response.redirect(newUrl);
+    }
+
+    // 대시보드 페이지 접근 시 항상 /dashboard/project로 리디렉트
+    if (isDashboardPage && req.nextUrl.pathname === "/dashboard") {
+      const newUrl = new URL("/dashboard/project", req.nextUrl.origin);
       return Response.redirect(newUrl);
     }
   }
