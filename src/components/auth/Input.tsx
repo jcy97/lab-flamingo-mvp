@@ -4,13 +4,18 @@ interface Props {
   name: string;
   required: boolean;
   placeHolder: string;
+  value: string; // 추가된 부분
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; // 추가된 부분
 }
+
 const Input: React.FC<Props> = ({
   title,
   type,
   name,
   required,
   placeHolder,
+  value, // 추가된 부분
+  onChange, // 추가된 부분
 }) => {
   return (
     <div className="mt-8 flex flex-col space-y-1">
@@ -21,8 +26,11 @@ const Input: React.FC<Props> = ({
         name={name}
         required={required}
         placeholder={placeHolder}
+        value={value} // 추가된 부분
+        onChange={onChange} // 추가된 부분
       />
     </div>
   );
 };
+
 export default Input;

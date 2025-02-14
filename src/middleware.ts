@@ -1,17 +1,33 @@
 import { auth } from "./server/auth";
 
-// auth 인증로직이 돌아갈 때 인증 여부를 검사해서
-// 인증되지 않았으면 로그인 화면으로 리디렉트
 export default auth((req) => {
   const isAuthenticated = !!req.auth;
 
+  // 로그인, 회원가입, 루트 페이지 체크
+  const isLoginPage = req.nextUrl.pathname === "/signin";
+  const isRegisterPage = req.nextUrl.pathname === "/register";
+  const isRootPage = req.nextUrl.pathname === "/";
+
   if (!isAuthenticated) {
-    const newUrl = new URL("/signin", req.nextUrl.origin);
-    return Response.redirect(newUrl);
+    // 비인증 상태일 때:
+    // 1. 회원가입 페이지는 허용
+    // 2. 로그인 페이지는 그대로 유지
+    // 3. 나머지 모든 페이지는 로그인 페이지로 리디렉트
+    if (!isRegisterPage && !isLoginPage) {
+      const newUrl = new URL("/signin", req.nextUrl.origin);
+      return Response.redirect(newUrl);
+    }
+  } else {
+    // 인증된 상태일 때:
+    // 로그인, 회원가입, 루트 페이지 접근 시 대시보드로 리디렉트
+    if (isLoginPage || isRegisterPage || isRootPage) {
+      const newUrl = new URL("/dashboard", req.nextUrl.origin);
+      return Response.redirect(newUrl);
+    }
   }
 });
 
-// 대시보드와 인덱스 페이지에 위 미들웨어 로직을 적용한다.
+// 미들웨어를 적용할 페이지 설정
 export const config = {
-  matcher: ["/dashboard", "/dashboard:path*", "/"], // 인덱스 페이지 추가
+  matcher: ["/dashboard", "/dashboard:path*", "/signin", "/register", "/"],
 };
