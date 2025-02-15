@@ -1,3 +1,9 @@
+import Header from "~/components/dashboard/project/header/Header";
+
 export default function Page() {
-  return <div>프로젝트 페이지입니다 ^^</div>;
+  return (
+    <div className="flex w-full flex-col px-12">
+      <Header />
+    </div>
+  );
 }
