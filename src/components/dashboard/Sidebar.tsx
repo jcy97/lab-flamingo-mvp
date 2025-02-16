@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import MenuButton from "./MenuButton";
 import menuList from "~/constants/menu";
+import LogoutButton from "./LogoutButton";
 
 const Sidebar = () => {
   const pathname = usePathname();
@@ -28,6 +29,9 @@ const Sidebar = () => {
           </Link>
         ))}
       </section>
+      <div className="mb-32 mt-auto">
+        <LogoutButton />
+      </div>
     </aside>
   );
 };

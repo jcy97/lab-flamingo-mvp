@@ -27,8 +27,8 @@ export default function Page() {
 
   return (
     <div className="flex min-h-screen select-none items-center justify-center bg-neutral-800">
-      <div className="animate-fade-in relative m-6 flex max-h-full min-h-[550px] min-w-[500px] max-w-full flex-col items-center rounded-2xl bg-neutral-700 shadow-2xl">
-        <img src="logo.png" alt="로고" className="mt-3 w-[350px]" />
+      <div className="relative m-6 flex max-h-full min-h-[550px] min-w-[500px] max-w-full animate-fade-in flex-col items-center rounded-2xl bg-neutral-700 shadow-2xl">
+        <img src="/logo.png" alt="로고" className="mt-3 w-[350px]" />
         <form action={formAction}>
           <div className="mb-8">
             <Input
@@ -57,7 +57,7 @@ export default function Page() {
             <span className="text-neutral-100">
               플라밍고가 처음이신가요?{" "}
               <Link
-                className="text-second-500 ml-1 font-bold hover:cursor-pointer"
+                className="ml-1 font-bold text-second-500 hover:cursor-pointer"
                 href="/signup"
               >
                 회원가입

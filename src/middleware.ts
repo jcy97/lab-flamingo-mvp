@@ -36,5 +36,5 @@ export default auth((req) => {
 
 // 미들웨어를 적용할 페이지 설정
 export const config = {
-  matcher: ["/dashboard", "/dashboard:path*", "/signin", "/register", "/"],
+  matcher: ["/dashboard", "/dashboard/:path*", "/signin", "/register", "/"],
 };

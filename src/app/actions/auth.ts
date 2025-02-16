@@ -7,7 +7,7 @@ import { db } from "~/server/db";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
 
-export const singOut = async () => {
+export const signout = async () => {
   await signOut();
 };
 
