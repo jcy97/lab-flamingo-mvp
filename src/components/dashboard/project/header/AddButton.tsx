@@ -22,7 +22,6 @@ const AddButton: React.FC = () => {
       >
         <AddProjectModal level={1} onClose={() => setIsModalOpen(false)} />
       </Modal>
-      ;
     </>
   );
 };

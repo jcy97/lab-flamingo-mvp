@@ -1,4 +1,5 @@
-import { object, string } from "zod";
+import { object, string, number, date, z } from "zod";
+import { Project as PrismaProject } from "@prisma/client";
 
 export const signUpSchema = object({
   email: string({ required_error: "이메일을 입력하세요" }).email(
@@ -24,3 +25,14 @@ export const signInSchema = object({
   ),
   password: string({ required_error: "비밀번호를 입력하세요" }),
 });
+
+export const projectSchema = object({
+  uuid: string(),
+  name: string().min(3, "프로젝트명은 3자리 이상이어야 합니다"),
+  created_at: date(),
+  created_user_id: string(),
+  updated_at: date(),
+  updated_user_id: string(),
+});
+
+export type Project = z.infer<typeof projectSchema>;

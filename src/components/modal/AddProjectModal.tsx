@@ -1,11 +1,33 @@
+import { useSetAtom } from "jotai";
 import { useState } from "react";
+import { createProject } from "~/app/actions/project";
+import { projectsAtom } from "~/store/atoms";
 
 interface Props {
   onClose: () => void;
   level: number;
 }
+
 const AddProjectModal: React.FC<Props> = ({ onClose, level }) => {
   const [projectName, setProjectName] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(""); // 에러 상태 추가
+  const setProject = useSetAtom(projectsAtom);
+
+  const handleSubmit = async () => {
+    setIsPending(true);
+    setErrorMessage("");
+
+    const project = await createProject(projectName);
+    setIsPending(false);
+
+    if (typeof project === "string") {
+      setErrorMessage(project);
+    } else if (project) {
+      setProject((prev) => [...prev, project]);
+      onClose();
+    }
+  };
 
   return (
     <div className="text-neutral-100">
@@ -21,16 +43,20 @@ const AddProjectModal: React.FC<Props> = ({ onClose, level }) => {
         />
       </div>
 
+      {errorMessage && <div className="mb-4 text-red-500">{errorMessage}</div>}
+
       <div className="flex justify-end gap-3">
         <button
           onClick={onClose}
           className="rounded-lg bg-neutral-700 px-4 py-2"
+          disabled={isPending}
         >
           취소
         </button>
         <button
-          onClick={() => {}}
+          onClick={handleSubmit}
           className="rounded-lg bg-primary-500 px-4 py-2 duration-300 hover:bg-primary-700 disabled:bg-neutral-500"
+          disabled={isPending}
         >
           {"생성"}
         </button>
