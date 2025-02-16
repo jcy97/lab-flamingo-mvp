@@ -8,6 +8,7 @@ import { ZodError } from "zod";
 
 export const createProject = async (name: string) => {
   const session = await auth();
+
   try {
     if (!session?.user.id) throw new Error("사용자가 존재하지 않습니다.");
 
@@ -25,17 +26,47 @@ export const createProject = async (name: string) => {
       updated_at: new Date(),
     });
 
-    const project = await db.project.create({
-      data: validatedProject,
+    // Transaction을 사용하여 Project 생성과 ProjectUser 생성을 atomic하게 처리
+    const result = await db.$transaction(async (tx) => {
+      // 1. Project 생성
+      const project = await tx.project.create({
+        data: validatedProject,
+      });
+
+      // 2. OWNER Role ID 조회
+      const ownerRole = await tx.role.findFirst({
+        where: {
+          name: "OWNER",
+          is_used: 1,
+        },
+      });
+
+      if (!ownerRole) {
+        throw new Error("OWNER 역할을 찾을 수 없습니다.");
+      }
+
+      // 3. ProjectUser 생성
+      await tx.projectUser.create({
+        data: {
+          project_id: project.id,
+          user_id: session.user.id,
+          role_id: ownerRole.id,
+          created_user_id: session.user.id,
+          updated_user_id: session.user.id,
+        },
+      });
+
+      return project;
     });
 
+    // 결과 반환
     const newProject: Project = {
-      uuid: project.uuid,
-      name: project.name,
-      created_at: project.created_at,
-      created_user_id: project.created_user_id,
-      updated_at: project.updated_at,
-      updated_user_id: project.updated_user_id,
+      uuid: result.uuid,
+      name: result.name,
+      created_at: result.created_at,
+      created_user_id: result.created_user_id,
+      updated_at: result.updated_at,
+      updated_user_id: result.updated_user_id,
     };
 
     return newProject;
@@ -45,33 +76,41 @@ export const createProject = async (name: string) => {
         return error.errors[0]!.message;
       }
     }
+    throw error; // 다른 에러는 상위로 전파
   }
 };
 
-// 사용자 프로젝트 조회 함수
 export const getUserProjects = async (): Promise<Project[]> => {
   const session = await auth();
 
   try {
     if (!session?.user.id) throw new Error("사용자가 존재하지 않습니다.");
 
-    // 사용자 ID로 프로젝트 조회
-    console.log(session.user.id);
-    const projects = await db.project.findMany({
-      where: { created_user_id: session.user.id },
+    // ProjectUser를 통해 사용자의 프로젝트 조회
+    const projectUsers = await db.projectUser.findMany({
+      where: {
+        user_id: session.user.id,
+      },
+      include: {
+        project: true, // project 관계를 포함하여 조회
+      },
     });
 
-    return projects.length > 0
-      ? projects.map((project) => ({
-          uuid: project.uuid,
-          name: project.name,
-          created_at: project.created_at,
-          created_user_id: project.created_user_id,
-          updated_at: project.updated_at,
-          updated_user_id: project.updated_user_id,
+    // 프로젝트 정보 매핑
+    return projectUsers.length > 0
+      ? projectUsers.map((projectUser) => ({
+          uuid: projectUser.project.uuid,
+          name: projectUser.project.name,
+          created_at: projectUser.project.created_at,
+          created_user_id: projectUser.project.created_user_id,
+          updated_at: projectUser.project.updated_at,
+          updated_user_id: projectUser.project.updated_user_id,
         }))
       : []; // 프로젝트가 없을 경우 빈 배열 반환
-  } catch (error: any) {
-    return error.message; // 에러 메시지 반환
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error; // 에러를 상위로 전파
+    }
+    throw new Error("알 수 없는 에러가 발생했습니다.");
   }
 };

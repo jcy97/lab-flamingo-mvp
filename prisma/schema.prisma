@@ -64,6 +64,7 @@ model User {
     accounts      Account[]
     sessions      Session[]
     posts         Post[]
+    project_users           ProjectUser[]
 }
 
 model VerificationToken {
@@ -82,4 +83,31 @@ model Project {
   created_user_id String
   updated_at      DateTime  @updatedAt
   updated_user_id String
+  project_users           ProjectUser[]
+}
+
+model Role {
+  id              Int      @id @default(autoincrement())
+  name            String
+  is_used         Int
+  created_at      DateTime @default(now())
+  created_user_id String
+  updated_at      DateTime @updatedAt
+  updated_user_id String
+  project_users           ProjectUser[]
+}
+
+
+model ProjectUser {
+  id              Int      @id @default(autoincrement())
+  project         Project   @relation(fields: [project_id], references: [id])
+  project_id      Int
+  user_id         String
+  role            Role      @relation(fields: [role_id], references: [id])
+  role_id         Int     
+  created_at      DateTime @default(now())
+  created_user_id String
+  updated_at      DateTime @updatedAt
+  updated_user_id String
+  user            User      @relation(fields: [user_id], references: [id])
 }
