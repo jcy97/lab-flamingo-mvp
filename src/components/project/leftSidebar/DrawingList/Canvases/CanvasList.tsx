@@ -24,42 +24,42 @@ const DUMMY = [
   {
     index: 4,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq7",
   },
   {
     index: 5,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq6",
   },
   {
     index: 6,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq5",
   },
   {
     index: 7,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq4",
   },
   {
     index: 8,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq3",
   },
   {
     index: 9,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq2",
   },
   {
     index: 10,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq1",
   },
   {
     index: 11,
     canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
+    canvas_id: "avsvs-egd-qqq",
   },
 ];
 
@@ -117,7 +117,7 @@ const CanvasList: React.FC = () => {
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
               onClick={() => setSelectedCanvas(canvas.canvas_id)}
-              className={`flex w-[210px] flex-col hover:cursor-pointer ${
+              className={`flex w-[210px] flex-col duration-150 hover:cursor-pointer ${
                 draggedItem === index
                   ? "opacity-50"
                   : dragOverItem === index

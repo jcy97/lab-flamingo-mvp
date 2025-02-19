@@ -1,4 +1,5 @@
 import LeftSidebar from "~/components/project/leftSidebar/LeftSidebar";
+import RightSidebar from "~/components/project/rightSidebar/RightSidebar";
 
 export default function PageLayout({
   children,
@@ -9,6 +10,7 @@ export default function PageLayout({
     <>
       <main>
         <LeftSidebar />
+        <RightSidebar />
         <div className="w-full">{children}</div>
       </main>
     </>
