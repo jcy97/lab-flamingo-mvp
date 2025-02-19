@@ -15,9 +15,26 @@ const Tooltip: React.FC<TooltipProps> = ({ children, content }) => {
       onMouseLeave={() => setIsVisible(false)}
     >
       {children}
-
       {isVisible && (
-        <div className="absolute top-full mt-2 w-max rounded bg-gray-700 p-1 text-center text-sm text-neutral-100">
+        <div
+          className="fixed z-50 mt-2 w-max transform rounded bg-gray-700 p-1 text-center text-sm text-neutral-100"
+          style={{
+            left: "var(--tooltip-x)",
+            top: "var(--tooltip-y)",
+          }}
+          ref={(el) => {
+            if (el) {
+              const rect = el.parentElement?.getBoundingClientRect();
+              if (rect) {
+                el.style.setProperty(
+                  "--tooltip-x",
+                  `${rect.left + rect.width / 2 - el.offsetWidth / 2}px`,
+                );
+                el.style.setProperty("--tooltip-y", `${rect.bottom + 8}px`);
+              }
+            }
+          }}
+        >
           {content}
         </div>
       )}

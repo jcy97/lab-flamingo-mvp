@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Header from "./Header/Header";
+import ControlArea from "./ControlArea/ControlArea";
 // import DrawingList from "./DrawingList/DrawingList";
 
 const RightSidebar: React.FC = () => {
@@ -49,7 +50,7 @@ const RightSidebar: React.FC = () => {
         </style>
       )}
       <Header />
-      {/* <DrawingList /> */}
+      <ControlArea />
     </aside>
   );
 };

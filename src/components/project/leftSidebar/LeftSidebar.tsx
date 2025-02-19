@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import Header from "./Header/Header";
-import DrawingList from "./DrawingList/DrawingList";
+import ManagementArea from "./ManagementArea/ManagementArea";
 
 const LeftSidebar: React.FC = () => {
   const [width, setWidth] = useState(240); //초기너비
@@ -49,7 +49,7 @@ const LeftSidebar: React.FC = () => {
         </style>
       )}
       <Header />
-      <DrawingList />
+      <ManagementArea />
     </aside>
   );
 };

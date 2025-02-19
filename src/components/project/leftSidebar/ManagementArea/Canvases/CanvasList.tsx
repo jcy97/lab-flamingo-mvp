@@ -58,8 +58,18 @@ const DUMMY = [
   },
   {
     index: 11,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq",
+    canvas_name: "캔버스9",
+    canvas_id: "avsvs-egd-sadasd",
+  },
+  {
+    index: 12,
+    canvas_name: "캔버스10",
+    canvas_id: "avsvs-egd-qasd",
+  },
+  {
+    index: 13,
+    canvas_name: "캔버스11",
+    canvas_id: "avsvs-egd-qasd123",
   },
 ];
 

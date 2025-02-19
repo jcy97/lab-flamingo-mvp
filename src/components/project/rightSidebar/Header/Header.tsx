@@ -1,10 +1,11 @@
-import Status from "~/components/common/profile/Status";
-import CurrentConnectedUsers from "./CurrentConnectedUsers";
+import Connection from "./Connection";
+import MeetingConnection from "./MeetingConnection";
 
-const Header: React.FC = () => {
+const Header = () => {
   return (
-    <div className="flex justify-between">
-      <CurrentConnectedUsers />
+    <div className="flex w-full flex-col border-b border-neutral-700 pb-3">
+      <Connection />
+      <MeetingConnection />
     </div>
   );
 };
