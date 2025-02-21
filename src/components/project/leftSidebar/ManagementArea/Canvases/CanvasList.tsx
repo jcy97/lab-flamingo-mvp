@@ -139,7 +139,7 @@ const CanvasList: React.FC = () => {
               <div
                 className={`overflow-hidden rounded-lg ${
                   selectedCanvas === canvas.canvas_id
-                    ? "bg-primary-500"
+                    ? "bg-primary-300"
                     : "bg-neutral-800 hover:bg-neutral-700"
                 }`}
               >

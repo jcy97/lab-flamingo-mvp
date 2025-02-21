@@ -1,12 +1,15 @@
 "use client";
 import { useAtom } from "jotai";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getUserProjects } from "~/app/actions/project";
+import { Project } from "~/schemas";
 import { projectsAtom } from "~/store/atoms";
 
 const Main: React.FC = () => {
   const [projects, setProjects] = useAtom(projectsAtom);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -23,6 +26,11 @@ const Main: React.FC = () => {
     fetchProjects();
   }, [setProjects]);
 
+  const handleProjectClick = (project: Project) => {
+    const proejctId = project.uuid;
+    router.push(`/project/${proejctId}`);
+  };
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -38,6 +46,7 @@ const Main: React.FC = () => {
           <div
             key={project.uuid}
             className="flex h-44 flex-col items-center rounded-lg border border-neutral-300 bg-neutral-800 p-4 duration-300"
+            onClick={() => handleProjectClick(project)}
           >
             <div className="hover:cursor-ㅊ flex flex-col items-center duration-300 hover:scale-105">
               <img

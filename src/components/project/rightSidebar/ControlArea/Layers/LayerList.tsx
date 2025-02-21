@@ -146,7 +146,7 @@ const LayerList: React.FC = () => {
                   : ""
             } ${
               selectedLayer === layer.layer_id
-                ? "bg-primary-500"
+                ? "bg-neutral-500"
                 : "bg-neutral-800 hover:bg-neutral-700"
             }`}
           >
@@ -154,7 +154,7 @@ const LayerList: React.FC = () => {
               <IoMdEye className="text-neutral-100" size={22} />
             </div>
             <div className="flex flex-1 items-center gap-2 px-3 py-2">
-              <div className="h-[40px] w-[45px] bg-neutral-500"></div>
+              <div className="h-[40px] w-[45px] bg-neutral-100"></div>
               <input
                 type="text"
                 value={layer.layer_name}
