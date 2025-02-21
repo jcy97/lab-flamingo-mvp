@@ -5,6 +5,7 @@ import { db } from "~/server/db";
 import { v4 as uuidv4 } from "uuid";
 import { projectSchema, Project } from "~/schemas";
 import { ZodError } from "zod";
+import { mongo } from "~/server/mongo";
 
 export const createProject = async (name: string) => {
   const session = await auth();

@@ -48,7 +48,7 @@ const Main: React.FC = () => {
             className="flex h-44 flex-col items-center rounded-lg border border-neutral-300 bg-neutral-800 p-4 duration-300"
             onClick={() => handleProjectClick(project)}
           >
-            <div className="hover:cursor-ㅊ flex flex-col items-center duration-300 hover:scale-105">
+            <div className="flex flex-col items-center duration-300 hover:scale-105">
               <img
                 src={"/logo.png"}
                 alt={`${project.name} 썸네일`}
