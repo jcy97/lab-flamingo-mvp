@@ -1,5 +1,3 @@
-import LeftSidebar from "~/components/project/leftSidebar/LeftSidebar";
-
 export default function ProjectLayout({
   children,
 }: {

@@ -1,43 +1,23 @@
-import React, { useState } from "react";
-
-const DUMMY_PAGE = [
-  {
-    page_index: 0,
-    page_id: "aaaa-fff-bbb-cccc",
-    page_name: "페이지1",
-    current_canvas_id: "bbbb-ffff-dddd-aaaa",
-  },
-  {
-    page_index: 1,
-    page_id: "aaaa-fff-bbb-dddd",
-    page_name: "페이지2",
-    current_canvas_id: "bbbb-ffff-dddd-aaaa",
-  },
-  {
-    page_index: 2,
-    page_id: "aaaa-fff-bbb-ffff",
-    page_name: "페이지3",
-    current_canvas_id: "bbbb-ffff-dddd-aaaa",
-  },
-  {
-    page_index: 3,
-    page_id: "aaaa-fff-bbb-gggg",
-    page_name: "페이지4",
-    current_canvas_id: "bbbb-ffff-dddd-aaaa",
-  },
-];
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import React, { useEffect, useState } from "react";
+import {
+  currentCanvasAtom,
+  currentPageAtom,
+  pageCanvasInformationAtom,
+} from "~/store/atoms";
 
 const PageList: React.FC = () => {
-  const [pages, setPages] = useState(DUMMY_PAGE);
-  const [selectedPage, setSelectedPage] = useState<string | null>(
-    DUMMY_PAGE[0]!.page_id,
-  );
+  const [pages, setPages] = useAtom(pageCanvasInformationAtom);
+  const [currentPage, setCurrentPage] = useAtom(currentPageAtom);
+  const setCurrentCanvas = useSetAtom(currentCanvasAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
+  useEffect(() => {
+    //setCurrentCanvas(currentPage!.);
+  }, [currentPage]);
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
-    // 브라우저 기본 드래그 아이콘 제거
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setDragImage(new Image(), 0, 0);
   };
@@ -54,15 +34,15 @@ const PageList: React.FC = () => {
       return;
     }
 
-    const newPages = [...pages];
+    const newPages = [...pages!];
     const draggedPage = newPages[draggedItem]!;
 
-    // 드래그가 끝났을 때만 위치 교환
-    const tempIndex = draggedPage.page_index;
-    draggedPage.page_index = newPages[dragOverItem]!.page_index;
-    newPages[dragOverItem]!.page_index = tempIndex;
+    // Update index values
+    const tempIndex = draggedPage.index;
+    draggedPage.index = newPages[dragOverItem]!.index;
+    newPages[dragOverItem]!.index = tempIndex;
 
-    // 재정렬
+    // Reorder array
     newPages.splice(draggedItem, 1);
     newPages.splice(dragOverItem, 0, draggedPage);
 
@@ -75,17 +55,17 @@ const PageList: React.FC = () => {
     <div className="h-[90%] overflow-y-auto">
       <div className="flex w-full flex-col gap-2 overflow-y-auto">
         {pages
-          .sort((a, b) => a.page_index - b.page_index)
+          .sort((a, b) => a.index - b.index)
           .map((page, index) => (
             <div
-              key={page.page_id}
+              key={page.id}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-              onClick={() => setSelectedPage(page.page_id)}
+              onClick={() => setCurrentPage(page)}
               className={`flex h-[25px] min-w-[210px] cursor-pointer items-center rounded px-2 text-xs text-neutral-100 ${
-                selectedPage === page.page_id
+                currentPage!.id === page.id
                   ? "bg-primary-500 hover:bg-primary-500"
                   : "bg-neutral-900"
               } ${
@@ -96,7 +76,7 @@ const PageList: React.FC = () => {
                     : ""
               } transition-colors duration-100 hover:bg-neutral-700`}
             >
-              {page.page_name}
+              {page.name}
             </div>
           ))}
       </div>

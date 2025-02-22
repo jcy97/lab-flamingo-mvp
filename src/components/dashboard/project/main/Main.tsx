@@ -1,13 +1,14 @@
 "use client";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getInitialProjectUrl, getUserProjects } from "~/app/actions/project";
 import { Project } from "~/schemas";
-import { projectsAtom } from "~/store/atoms";
+import { currentProjectAtom, projectsAtom } from "~/store/atoms";
 
 const Main: React.FC = () => {
   const [projects, setProjects] = useAtom(projectsAtom);
+  const setCurrentProject = useSetAtom(currentProjectAtom);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -29,6 +30,7 @@ const Main: React.FC = () => {
   const handleProjectClick = async (project: Project) => {
     const projectId = project.uuid;
     const projectUrl = await getInitialProjectUrl(projectId);
+    setCurrentProject(project);
     if (projectUrl) {
       router.push(projectUrl);
     }
