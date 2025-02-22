@@ -1,86 +1,20 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
-const DUMMY = [
-  {
-    index: 0,
-    canvas_name: "캔버스1",
-    canvas_id: "abcd-efgf-qqqq",
-  },
-  {
-    index: 1,
-    canvas_name: "캔버스2",
-    canvas_id: "abcd-1112-qqqq",
-  },
-  {
-    index: 2,
-    canvas_name: "캔버스3",
-    canvas_id: "abcd-asdf-qqqq",
-  },
-  {
-    index: 3,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqqq",
-  },
-  {
-    index: 4,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq7",
-  },
-  {
-    index: 5,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq6",
-  },
-  {
-    index: 6,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq5",
-  },
-  {
-    index: 7,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq4",
-  },
-  {
-    index: 8,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq3",
-  },
-  {
-    index: 9,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq2",
-  },
-  {
-    index: 10,
-    canvas_name: "캔버스4",
-    canvas_id: "avsvs-egd-qqq1",
-  },
-  {
-    index: 11,
-    canvas_name: "캔버스9",
-    canvas_id: "avsvs-egd-sadasd",
-  },
-  {
-    index: 12,
-    canvas_name: "캔버스10",
-    canvas_id: "avsvs-egd-qasd",
-  },
-  {
-    index: 13,
-    canvas_name: "캔버스11",
-    canvas_id: "avsvs-egd-qasd123",
-  },
-];
+import { Canvas } from "@prisma/mongodb-client";
+import { currentCanvasAtom, currentCanvasesAtom } from "~/store/atoms";
 
 const CanvasList: React.FC = () => {
-  const [canvases, setCanvases] = useState(DUMMY);
-  const [selectedCanvas, setSelectedCanvas] = useState<string>(
-    DUMMY[0]!.canvas_id,
-  );
+  const [currentCanvases, setCurrentCanvases] = useAtom(currentCanvasesAtom);
+  const [selectedCanvas, setSelectedCanvas] = useAtom(currentCanvasAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
+  useEffect(() => {
+    if (selectedCanvas === undefined) {
+      setSelectedCanvas(currentCanvases[0]);
+    }
+  }, [currentCanvases]);
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
     e.dataTransfer.effectAllowed = "move";
@@ -93,40 +27,55 @@ const CanvasList: React.FC = () => {
   };
 
   const handleDragEnd = () => {
-    if (draggedItem === null || dragOverItem === null) {
+    if (
+      !currentCanvases ||
+      draggedItem === null ||
+      dragOverItem === null ||
+      draggedItem === dragOverItem
+    ) {
       setDraggedItem(null);
       setDragOverItem(null);
       return;
     }
 
-    const newCanvases = [...canvases];
+    const newCanvases = [...currentCanvases];
     const draggedCanvas = newCanvases[draggedItem];
 
+    // 인덱스 교체
     const tempIndex = draggedCanvas!.index;
     draggedCanvas!.index = newCanvases[dragOverItem]!.index;
     newCanvases[dragOverItem]!.index = tempIndex;
 
-    newCanvases.splice(draggedItem, 1);
-    newCanvases.splice(dragOverItem, 0, draggedCanvas!);
+    // 배열 위치 변경
+    const [removed] = newCanvases.splice(draggedItem, 1);
+    newCanvases.splice(dragOverItem, 0, removed!);
 
-    setCanvases(newCanvases);
+    setCurrentCanvases(newCanvases);
     setDraggedItem(null);
     setDragOverItem(null);
   };
 
+  if (!currentCanvases || currentCanvases.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center text-neutral-400">
+        캔버스가 존재하지 않습니다
+      </div>
+    );
+  }
+
   return (
     <div className="h-[90%] overflow-y-auto">
       <div className="flex flex-col items-center gap-4 py-2">
-        {canvases
+        {currentCanvases
           .sort((a, b) => a.index - b.index)
           .map((canvas, index) => (
             <div
-              key={canvas.canvas_id}
+              key={canvas.id}
               draggable
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-              onClick={() => setSelectedCanvas(canvas.canvas_id)}
+              onClick={() => setSelectedCanvas(canvas)}
               className={`flex w-[210px] flex-col duration-150 hover:cursor-pointer ${
                 draggedItem === index
                   ? "opacity-50"
@@ -138,7 +87,7 @@ const CanvasList: React.FC = () => {
               {/* 썸네일 컨테이너 */}
               <div
                 className={`overflow-hidden rounded-lg ${
-                  selectedCanvas === canvas.canvas_id
+                  selectedCanvas!.id === canvas.id
                     ? "bg-primary-300"
                     : "bg-neutral-800 hover:bg-neutral-700"
                 }`}
@@ -146,7 +95,7 @@ const CanvasList: React.FC = () => {
                 {/* 캔버스 타이틀 */}
                 <div className="flex justify-between px-3 py-1">
                   <span className="text-sm font-medium text-neutral-100">
-                    {canvas.canvas_name}
+                    {canvas.name}
                   </span>
                   <IoMdSettings
                     className="text-neutral-100 duration-150 hover:scale-105 hover:cursor-pointer"

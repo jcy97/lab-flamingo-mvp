@@ -1,7 +1,7 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import React, { useEffect, useState } from "react";
 import {
-  currentCanvasAtom,
+  currentCanvasesAtom,
   currentPageAtom,
   pageCanvasInformationAtom,
 } from "~/store/atoms";
@@ -9,12 +9,12 @@ import {
 const PageList: React.FC = () => {
   const [pages, setPages] = useAtom(pageCanvasInformationAtom);
   const [currentPage, setCurrentPage] = useAtom(currentPageAtom);
-  const setCurrentCanvas = useSetAtom(currentCanvasAtom);
+  const setCurrentCanvases = useSetAtom(currentCanvasesAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
   useEffect(() => {
-    //setCurrentCanvas(currentPage!.);
+    setCurrentCanvases(currentPage!.page_canvases);
   }, [currentPage]);
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
