@@ -9,11 +9,9 @@ const Header: React.FC = () => {
           size={20}
         />
       </div>
-      <input
-        type="text"
-        value="테스트" // TODO 타이틀 상태 적용 필요
-        className="border-none bg-transparent pl-1 text-sm font-bold text-neutral-100 outline-none"
-      />
+      <p className="w-full border-none bg-transparent pl-1 text-sm font-bold text-neutral-100 outline-none">
+        테스트
+      </p>
     </div>
   );
 };

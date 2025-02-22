@@ -2,7 +2,7 @@
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getUserProjects } from "~/app/actions/project";
+import { getInitialProjectUrl, getUserProjects } from "~/app/actions/project";
 import { Project } from "~/schemas";
 import { projectsAtom } from "~/store/atoms";
 
@@ -26,9 +26,12 @@ const Main: React.FC = () => {
     fetchProjects();
   }, [setProjects]);
 
-  const handleProjectClick = (project: Project) => {
-    const proejctId = project.uuid;
-    router.push(`/project/${proejctId}`);
+  const handleProjectClick = async (project: Project) => {
+    const projectId = project.uuid;
+    const projectUrl = await getInitialProjectUrl(projectId);
+    if (projectUrl) {
+      router.push(projectUrl);
+    }
   };
 
   if (loading) {
