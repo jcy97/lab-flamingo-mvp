@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
-import { Canvas } from "@prisma/mongodb-client";
 import { currentCanvasAtom, currentCanvasesAtom } from "~/store/atoms";
 
 const CanvasList: React.FC = () => {
