@@ -1,11 +1,9 @@
 "use server";
 
 import { auth } from "~/server/auth";
-import { db } from "~/server/db";
 import { v4 as uuidv4 } from "uuid";
 import { projectSchema, Project } from "~/schemas";
 import { ZodError } from "zod";
-import { mongo } from "~/server/mongo";
 import {
   createProjectTransaction,
   createProjectWithDefaults,

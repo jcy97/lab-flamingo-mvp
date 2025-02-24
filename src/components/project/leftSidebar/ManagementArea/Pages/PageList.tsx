@@ -8,14 +8,14 @@ import {
 
 const PageList: React.FC = () => {
   const [pages, setPages] = useAtom(pageCanvasInformationAtom);
-  const [currentPage, setCurrentPage] = useAtom(currentPageAtom);
+  const [selectedPage, setSelectedPage] = useAtom(currentPageAtom);
   const setCurrentCanvases = useSetAtom(currentCanvasesAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
   useEffect(() => {
-    setCurrentCanvases(currentPage!.page_canvases);
-  }, [currentPage]);
+    setCurrentCanvases(selectedPage!.page_canvases);
+  }, [selectedPage]);
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
     e.dataTransfer.effectAllowed = "move";
@@ -63,9 +63,9 @@ const PageList: React.FC = () => {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-              onClick={() => setCurrentPage(page)}
+              onClick={() => setSelectedPage(page)}
               className={`flex h-[25px] min-w-[210px] cursor-pointer items-center rounded px-2 text-xs text-neutral-100 ${
-                currentPage!.id === page.id
+                selectedPage!.id === page.id
                   ? "bg-primary-500 hover:bg-primary-500"
                   : "bg-neutral-900"
               } ${

@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
-import { useAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
-import { currentCanvasAtom, currentCanvasesAtom } from "~/store/atoms";
+import {
+  currentCanvasAtom,
+  currentCanvasesAtom,
+  currentLayersAtom,
+} from "~/store/atoms";
 
 const CanvasList: React.FC = () => {
-  const [currentCanvases, setCurrentCanvases] = useAtom(currentCanvasesAtom);
+  const [canvases, setCanvases] = useAtom(currentCanvasesAtom);
   const [selectedCanvas, setSelectedCanvas] = useAtom(currentCanvasAtom);
+  const setCurrentLayers = useSetAtom(currentLayersAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
 
   useEffect(() => {
-    if (selectedCanvas === undefined) {
-      setSelectedCanvas(currentCanvases[0]);
-    }
-  }, [currentCanvases]);
+    setCurrentLayers(selectedCanvas!.canvas_layers);
+  }, [selectedCanvas]);
+
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
     e.dataTransfer.effectAllowed = "move";
@@ -27,7 +31,7 @@ const CanvasList: React.FC = () => {
 
   const handleDragEnd = () => {
     if (
-      !currentCanvases ||
+      !canvases ||
       draggedItem === null ||
       dragOverItem === null ||
       draggedItem === dragOverItem
@@ -37,7 +41,7 @@ const CanvasList: React.FC = () => {
       return;
     }
 
-    const newCanvases = [...currentCanvases];
+    const newCanvases = [...canvases];
     const draggedCanvas = newCanvases[draggedItem];
 
     // 인덱스 교체
@@ -49,12 +53,12 @@ const CanvasList: React.FC = () => {
     const [removed] = newCanvases.splice(draggedItem, 1);
     newCanvases.splice(dragOverItem, 0, removed!);
 
-    setCurrentCanvases(newCanvases);
+    setCanvases(newCanvases);
     setDraggedItem(null);
     setDragOverItem(null);
   };
 
-  if (!currentCanvases || currentCanvases.length === 0) {
+  if (!canvases || canvases.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-neutral-400">
         캔버스가 존재하지 않습니다
@@ -65,7 +69,7 @@ const CanvasList: React.FC = () => {
   return (
     <div className="h-[90%] overflow-y-auto">
       <div className="flex flex-col items-center gap-4 py-2">
-        {currentCanvases
+        {canvases
           .sort((a, b) => a.index - b.index)
           .map((canvas, index) => (
             <div

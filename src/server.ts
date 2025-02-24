@@ -4,6 +4,7 @@ import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
 import type { Server as HTTPServer } from "http";
+import { projectSocketHandler } from "./server/socket/socketHandler";
 
 const dev = process.env.NODE_ENV !== "production";
 const app = next({ dev });
@@ -23,20 +24,7 @@ app.prepare().then(() => {
     },
   });
 
-  // Socket.io 이벤트 핸들러
-  io.on("connection", (socket) => {
-    console.log(`Client connected: ${socket.id}`);
-
-    // 커스텀 이벤트 핸들링
-    socket.on("chatMessage", (msg) => {
-      console.log("Received message:", msg);
-      io.emit("newMessage", msg); // 모든 클라이언트에 브로드캐스트
-    });
-
-    socket.on("disconnect", () => {
-      console.log(`Client disconnected: ${socket.id}`);
-    });
-  });
+  projectSocketHandler(io);
 
   httpServer.listen(port, () => {
     console.log(`> Ready on http://localhost:${port}`);

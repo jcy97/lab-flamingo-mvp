@@ -1,3 +1,4 @@
+import { Session } from "next-auth";
 import { IconType } from "react-icons";
 
 export interface SubToolbarItem {
@@ -12,4 +13,9 @@ export interface ToolbarItem {
   icon: IconType;
   hasSubItems?: boolean;
   subItems?: SubToolbarItem[];
+}
+
+export interface CurrentConnectedUser {
+  socketId: string;
+  user: Session;
 }

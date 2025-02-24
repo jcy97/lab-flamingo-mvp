@@ -1,94 +1,14 @@
-import { useState } from "react";
+"use client";
+import { useEffect, useState } from "react";
 import { IoMdEye } from "react-icons/io";
 import { IoMdEyeOff } from "react-icons/io";
 import { HiOutlineAdjustments } from "react-icons/hi";
-
-const DUMMY_LAYERS = [
-  {
-    layer_index: 0,
-    layer_id: "1",
-    layer_name: "레이어1",
-    visible: true,
-  },
-  {
-    layer_index: 0,
-    layer_id: "15",
-    layer_name: "레이어2",
-    visible: true,
-  },
-  {
-    layer_index: 1,
-    layer_id: "2",
-    layer_name: "레이어3",
-    visible: true,
-  },
-  {
-    layer_index: 2,
-    layer_id: "3",
-    layer_name: "레이어4",
-    visible: true,
-  },
-  {
-    layer_index: 3,
-    layer_id: "4",
-    layer_name: "레이어5",
-    visible: true,
-  },
-  {
-    layer_index: 4,
-    layer_id: "5",
-    layer_name: "레이어6",
-    visible: true,
-  },
-  {
-    layer_index: 5,
-    layer_id: "6",
-    layer_name: "레이어7",
-    visible: true,
-  },
-  {
-    layer_index: 6,
-    layer_id: "7",
-    layer_name: "레이어7",
-    visible: true,
-  },
-  {
-    layer_index: 7,
-    layer_id: "8",
-    layer_name: "레이어7",
-    visible: true,
-  },
-  {
-    layer_index: 8,
-    layer_id: "9",
-    layer_name: "레이어7",
-    visible: true,
-  },
-  {
-    layer_index: 9,
-    layer_id: "10",
-    layer_name: "레이어7",
-    visible: true,
-  },
-  {
-    layer_index: 9,
-    layer_id: "11",
-    layer_name: "레이어10",
-    visible: true,
-  },
-  {
-    layer_index: 10,
-    layer_id: "12",
-    layer_name: "레이어11",
-    visible: true,
-  },
-];
+import { useAtom } from "jotai";
+import { currentLayerAtom, currentLayersAtom } from "~/store/atoms";
 
 const LayerList: React.FC = () => {
-  const [layers, setLayers] = useState(DUMMY_LAYERS);
-  const [selectedLayer, setSelectedLayer] = useState<string | null>(
-    DUMMY_LAYERS[0]!.layer_id,
-  );
+  const [layers, setLayers] = useAtom(currentLayersAtom);
+  const [selectedLayer, setSelectedLayer] = useAtom(currentLayerAtom);
 
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
@@ -114,9 +34,9 @@ const LayerList: React.FC = () => {
     const newLayers = [...layers];
     const draggedLayers = newLayers[draggedItem];
 
-    const tempIndex = draggedLayers!.layer_index;
-    draggedLayers!.layer_index = newLayers[dragOverItem]!.layer_index;
-    newLayers[dragOverItem]!.layer_index = tempIndex;
+    const tempIndex = draggedLayers!.index;
+    draggedLayers!.index = newLayers[dragOverItem]!.index;
+    newLayers[dragOverItem]!.index = tempIndex;
 
     newLayers.splice(draggedItem, 1);
     newLayers.splice(dragOverItem, 0, draggedLayers!);
@@ -129,15 +49,15 @@ const LayerList: React.FC = () => {
   return (
     <div className="flex h-full w-full flex-col gap-1 overflow-y-auto">
       {layers
-        .sort((a, b) => a.layer_index - b.layer_index)
+        .sort((a, b) => a.index - b.index)
         .map((layer, index) => (
           <section
-            key={layer.layer_id}
+            key={layer.id}
             draggable
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            onClick={() => setSelectedLayer(layer.layer_id)}
+            onClick={() => setSelectedLayer(layer)}
             className={`flex min-h-[55px] w-full items-center justify-between rounded-lg transition-all duration-150 hover:cursor-pointer ${
               draggedItem === index
                 ? "opacity-50"
@@ -145,7 +65,7 @@ const LayerList: React.FC = () => {
                   ? "border-2 border-primary-500"
                   : ""
             } ${
-              selectedLayer === layer.layer_id
+              selectedLayer!.id === layer.id
                 ? "bg-neutral-500"
                 : "bg-neutral-800 hover:bg-neutral-700"
             }`}
@@ -157,7 +77,7 @@ const LayerList: React.FC = () => {
               <div className="h-[40px] w-[45px] bg-neutral-100"></div>
               <input
                 type="text"
-                value={layer.layer_name}
+                value={layer.name}
                 className="max-w-[100px] bg-transparent text-sm text-neutral-100 outline-none hover:cursor-pointer"
                 style={{ minWidth: "0" }}
               />

@@ -40,7 +40,8 @@ model Canvas {
   updated_user_id String   
   page            Page     @relation(fields: [page_id], references: [id])
   page_id         String
-  canvas_layers   Layer[]
+  canvas_layers   Layer[] 
+
 }
 
 model Layer {
