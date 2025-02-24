@@ -40,4 +40,17 @@ model Canvas {
   updated_user_id String   
   page            Page     @relation(fields: [page_id], references: [id])
   page_id         String
+  canvas_layers   Layer[]
+}
+
+model Layer {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  name            String
+  index           Int
+  created_at      DateTime @default(now())
+  created_user_id String
+  updated_at      DateTime @updatedAt
+  updated_user_id String   
+  canvas          Canvas   @relation(fields: [canvas_id], references: [id])
+  canvas_id       String   
 }
