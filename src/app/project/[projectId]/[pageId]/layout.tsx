@@ -37,10 +37,13 @@ export default function PageLayout({
   const projectIdinUrl = pathname.split("/")[2]!;
 
   useEffect(() => {
-    let cleanup: (() => Promise<void>) | undefined;
+    const projectId = currentProject?.uuid || projectIdinUrl;
+    if (status !== "authenticated" || !projectId) return;
 
-    const getCanvasInformation = async () => {
-      if (status !== "authenticated") return;
+    const initialize = async () => {
+      console.log(123);
+      // 기존 소켓 연결 해제
+      await disconnectSocket();
       const projectId = currentProject ? currentProject.uuid : projectIdinUrl;
       const canvasInformation = await getPagesWithCanvases(projectId!);
       setPageCanvasInformation(canvasInformation);
@@ -52,19 +55,16 @@ export default function PageLayout({
       setCurrentLayer(canvasInformation[0]!.page_canvases[0]!.canvas_layers[0]);
 
       await initSocket(projectId, user!);
-      cleanup = disconnectSocket; // cleanup 함수 저장
 
       setIsLoading(false);
     };
 
-    getCanvasInformation();
+    initialize();
 
     return () => {
-      if (cleanup) {
-        cleanup(); // 컴포넌트 언마운트 시 소켓 연결 해제
-      }
+      disconnectSocket();
     };
-  }, [status]);
+  }, [status, projectIdinUrl, currentProject?.uuid, user?.user.id]);
 
   if (isLoading) {
     return (
