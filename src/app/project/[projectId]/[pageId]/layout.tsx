@@ -41,7 +41,6 @@ export default function PageLayout({
     if (status !== "authenticated" || !projectId) return;
 
     const initialize = async () => {
-      console.log(123);
       // 기존 소켓 연결 해제
       await disconnectSocket();
       const projectId = currentProject ? currentProject.uuid : projectIdinUrl;
