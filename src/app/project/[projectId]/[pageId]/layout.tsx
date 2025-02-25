@@ -27,7 +27,6 @@ export default function PageLayout({
 }) {
   const [isLoading, setIsLoading] = useAtom(projectLoadingAtom);
   const currentProject = useAtomValue(currentProjectAtom);
-  const canvasInformation = useAtomValue(pageCanvasInformationAtom);
   const { data: user, status } = useSession();
 
   const pathname = usePathname();
@@ -51,10 +50,6 @@ export default function PageLayout({
       disconnectSocket();
     };
   }, [status, projectIdinUrl, currentProject?.uuid, user?.user.id]);
-
-  useEffect(() => {
-    console.log(canvasInformation);
-  }, [canvasInformation]);
 
   if (isLoading) {
     return <LoadingSpinner />;

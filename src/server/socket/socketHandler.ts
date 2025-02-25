@@ -5,6 +5,7 @@ import {
   removeConnectedUser,
 } from "../store/serverStore";
 import { getPagesWithCanvases } from "../../app/actions/canvas";
+import { savePagesWithCanvasesAndLayers } from "../service/canvas";
 
 // 소켓 이벤트 핸들러 함수 정의
 export const projectSocketHandler = (io: Server) => {
@@ -22,9 +23,9 @@ export const projectSocketHandler = (io: Server) => {
       io.to(project).emit("updateUserList", userList);
     });
 
-    /* 
+    /*****************
       페이지 동기화 처리
-    */
+    ******************/
     socket.on("getProjectPages", async ({ project }, callback) => {
       try {
         const canvasInformation = await getPagesWithCanvases(project!);
@@ -32,6 +33,22 @@ export const projectSocketHandler = (io: Server) => {
       } catch (error) {
         console.error("페이지 목록 불러오기 실패");
         callback([]);
+      }
+    });
+
+    socket.on("savePages", async ({ project, pages }) => {
+      try {
+        // 페이지 트랜잭션으로 저장 작업을 수행
+        await savePagesWithCanvasesAndLayers(project, pages);
+
+        // 성공적으로 저장되었음을 알림 (선택적)
+        socket.emit("pagesSaved", { success: true });
+      } catch (error) {
+        console.error("페이지 저장 실패:", error);
+        socket.emit("pagesSaved", {
+          success: false,
+          error: "페이지 저장에 실패했습니다.",
+        });
       }
     });
 

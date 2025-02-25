@@ -5,6 +5,7 @@ import { io, Socket } from "socket.io-client";
 import { SOCKET_URL } from "~/constants/socket";
 import { currentConnectedUserAtom } from "~/store/atoms";
 import { initPageYjs } from "./pageYjs";
+import { yProvidersAtom } from "~/store/yjsAtoms";
 
 const store = getDefaultStore();
 // socket.ts
@@ -35,6 +36,12 @@ export const initProjectSocket = async (project: string, session: Session) => {
 };
 
 export const disconnectSocket = async () => {
+  // // YJS 프로바이더 정리
+  // const providers = store.get(yProvidersAtom);
+  // Object.values(providers).forEach((provider) => {
+  //   provider.disconnect();
+  // });
+  // store.set(yProvidersAtom, {});
   if (socket) {
     console.log("소켓 연결 종료");
     socket.removeAllListeners();
