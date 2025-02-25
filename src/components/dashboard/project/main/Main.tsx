@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getInitialProjectUrl, getUserProjects } from "~/app/actions/project";
 import { Project } from "~/schemas";
-import { currentProjectAtom, projectsAtom } from "~/store/atoms";
+import { currentProjectAtom, isLoadingAtom, projectsAtom } from "~/store/atoms";
 
 const Main: React.FC = () => {
   const [projects, setProjects] = useAtom(projectsAtom);
   const setCurrentProject = useSetAtom(currentProjectAtom);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const setIsLoading = useSetAtom(isLoadingAtom);
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -28,6 +29,7 @@ const Main: React.FC = () => {
   }, [setProjects]);
 
   const handleProjectClick = async (project: Project) => {
+    setIsLoading(true);
     const projectId = project.uuid;
     const projectUrl = await getInitialProjectUrl(projectId);
     setCurrentProject(project);

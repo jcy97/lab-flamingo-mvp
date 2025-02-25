@@ -4,6 +4,7 @@ import {
   getConnectedUsers,
   removeConnectedUser,
 } from "../store/serverStore";
+import { getPagesWithCanvases } from "../../app/actions/canvas";
 
 // 소켓 이벤트 핸들러 함수 정의
 export const projectSocketHandler = (io: Server) => {
@@ -19,6 +20,19 @@ export const projectSocketHandler = (io: Server) => {
       // 모든 클라이언트에게 유저 리스트 전파
       const userList = getConnectedUsers(project);
       io.to(project).emit("updateUserList", userList);
+    });
+
+    /* 
+      페이지 동기화 처리
+    */
+    socket.on("getProjectPages", async ({ project }, callback) => {
+      try {
+        const canvasInformation = await getPagesWithCanvases(project!);
+        callback(canvasInformation);
+      } catch (error) {
+        console.error("페이지 목록 불러오기 실패");
+        callback([]);
+      }
     });
 
     socket.on("disconnect", () => {

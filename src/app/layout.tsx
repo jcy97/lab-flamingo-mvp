@@ -2,6 +2,7 @@ import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import AuthSession from "./AuthSession";
+import Main from "~/components/common/Main";
 
 export const metadata: Metadata = {
   title: "Flamingo MVP",
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
-        <AuthSession>{children}</AuthSession>
+        <AuthSession>
+          <Main>{children}</Main>
+        </AuthSession>
       </body>
     </html>
   );

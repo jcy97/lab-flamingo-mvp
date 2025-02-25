@@ -1,5 +1,5 @@
 import { PrismaClient } from "@prisma/mongodb-client";
-import { env } from "~/env";
+import { env } from "../env";
 
 const createMongoClient = () =>
   new PrismaClient({

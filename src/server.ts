@@ -1,3 +1,4 @@
+import "module-alias/register";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 import { createServer } from "http";
@@ -19,7 +20,7 @@ app.prepare().then(() => {
   // Socket.io 서버 초기화
   const io = new Server(httpServer, {
     cors: {
-      origin: dev ? "http://localhost:3000" : "your-production-domain.com", //TODO 도메인 추가 필요
+      origin: dev ? "ws://localhost:3000" : "your-production-domain.com", //TODO 도메인 추가 필요
       methods: ["GET", "POST"],
     },
   });

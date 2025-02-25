@@ -2,18 +2,15 @@
 import { getDefaultStore } from "jotai";
 import { Session } from "next-auth";
 import { io, Socket } from "socket.io-client";
+import { SOCKET_URL } from "~/constants/socket";
 import { currentConnectedUserAtom } from "~/store/atoms";
-
-const SOCKET_URL =
-  process.env.NODE_ENV === "production"
-    ? "https://your-domain.com"
-    : "http://localhost:3000";
+import { initPageYjs } from "./pageYjs";
 
 const store = getDefaultStore();
 // socket.ts
 let socket: Socket | null = null;
 
-export const initSocket = async (project: string, session: Session) => {
+export const initProjectSocket = async (project: string, session: Session) => {
   if (socket?.connected) return; // 이미 연결된 경우 재연결 방지
 
   socket = io(SOCKET_URL, {
@@ -25,6 +22,8 @@ export const initSocket = async (project: string, session: Session) => {
   socket.on("connect", () => {
     console.log("협업 채널에 접속하였습니다.");
     socket!.emit("connectUser", { project, user: session });
+
+    initPageYjs(socket!, project, session);
   });
 
   // 기존 이벤트 리스너 제거 후 재등록

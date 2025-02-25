@@ -3,12 +3,14 @@ import { Project } from "~/schemas";
 import { Canvas, Page, Layer } from "@prisma/mongodb-client";
 import { CurrentConnectedUser } from "~/types/types";
 
-type PageWithCanvases = Page & {
+export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
 };
-type CanvasWithLayers = Canvas & {
+export type CanvasWithLayers = Canvas & {
   canvas_layers: Layer[];
 };
+// 전역 로딩 상태 관리
+export const isLoadingAtom = atom<Boolean>(false);
 
 // 프로젝트 로딩 상태 관리
 export const projectLoadingAtom = atom<Boolean>(true);
@@ -20,6 +22,9 @@ export const currentProjectAtom = atom<Project>();
 
 // 현재 접속 프로젝트의 페이지 및 캔버스 정보
 export const pageCanvasInformationAtom = atom<PageWithCanvases[]>([]);
+
+// 페이지 변경 여부
+export const pagesUpdatedAtom = atom<boolean>(false);
 
 //현재 사용자가 선택한 페이지
 export const currentPageAtom = atom<PageWithCanvases>();
