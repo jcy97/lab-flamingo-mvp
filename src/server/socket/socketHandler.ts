@@ -5,7 +5,10 @@ import {
   removeConnectedUser,
 } from "../store/serverStore";
 import { getPagesWithCanvases } from "../../app/actions/canvas";
-import { savePagesWithCanvasesAndLayers } from "../service/canvas";
+import {
+  createNewPageWithDefaults,
+  savePagesWithCanvasesAndLayers,
+} from "../service/canvas";
 
 // 소켓 이벤트 핸들러 함수 정의
 export const projectSocketHandler = (io: Server) => {
@@ -48,6 +51,30 @@ export const projectSocketHandler = (io: Server) => {
         socket.emit("pagesSaved", {
           success: false,
           error: "페이지 저장에 실패했습니다.",
+        });
+      }
+    });
+
+    // 신규 페이지 생성 이벤트 핸들러 추가
+    socket.on("createNewPage", async (data, callback) => {
+      try {
+        const { project, pageData } = data;
+
+        // 새 페이지 트랜잭션으로 생성 작업을 수행
+        const result = await createNewPageWithDefaults(project, pageData);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 페이지 추가 알림 (선택적)
+        if (result.success) {
+          socket.to(project).emit("pageAdded", result.page);
+        }
+      } catch (error) {
+        console.error("페이지 생성 실패:", error);
+        callback({
+          success: false,
+          error: "페이지 생성에 실패했습니다.",
         });
       }
     });

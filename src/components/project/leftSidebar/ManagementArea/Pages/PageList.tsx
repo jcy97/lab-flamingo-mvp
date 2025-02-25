@@ -5,9 +5,10 @@ import {
   currentPageAtom,
   pageCanvasInformationAtom,
   pagesUpdatedAtom,
+  PageWithCanvases,
 } from "~/store/atoms";
 import {
-  getYpages,
+  getYPagesMap,
   reorderPages,
   addPage,
   deletePage,
@@ -50,16 +51,28 @@ const PageList: React.FC = () => {
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
     e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setDragImage(new Image(), 0, 0);
+    // 드래그 이미지를 숨김 (선택 사항)
+    const img = new Image();
+    img.src =
+      "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+    e.dataTransfer.setDragImage(img, 0, 0);
   };
 
   const handleDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    setDragOverItem(index);
+    // 현재 드래그된 아이템과 다른 경우에만 드래그 오버 상태 업데이트
+    if (draggedItem !== null && draggedItem !== index) {
+      setDragOverItem(index);
+    }
   };
 
   const handleDragEnd = () => {
-    if (draggedItem === null || dragOverItem === null) {
+    if (
+      draggedItem === null ||
+      dragOverItem === null ||
+      draggedItem === dragOverItem
+    ) {
+      // 유효하지 않은 드래그 또는 같은 위치로 드래그
       setDraggedItem(null);
       setDragOverItem(null);
       return;
@@ -68,14 +81,14 @@ const PageList: React.FC = () => {
     // YJS를 통해 페이지 재정렬
     reorderPages(draggedItem, dragOverItem);
 
+    // 상태 초기화
     setDraggedItem(null);
     setDragOverItem(null);
   };
-
   const handleAddPage = () => {
     if (!session || !pages.length) return;
 
-    const newPageName = `새 페이지 ${pages.length + 1}`;
+    const newPageName = `페이지 ${pages.length + 1}`;
     const projectId = pages[0]!.project_id;
 
     const newPageId = addPage(newPageName, session, projectId);
@@ -83,10 +96,14 @@ const PageList: React.FC = () => {
       // 새 페이지는 YJS 관찰자를 통해 자동으로 pages 상태에 추가됨
       // 필요하면 새 페이지로 직접 이동할 수 있음
       setTimeout(() => {
-        const newPages = Array.from(getYpages() || []);
-        const newPage = newPages.find((p) => p.id === newPageId);
-        if (newPage) {
-          setSelectedPage(newPage);
+        const yPagesMap = getYPagesMap();
+        if (yPagesMap) {
+          // Y.Map에서 값만 추출하여 배열로 변환 (올바른 타입으로)
+          const newPages = Array.from(yPagesMap.values()) as PageWithCanvases[];
+          const newPage = newPages.find((p) => p.id === newPageId);
+          if (newPage) {
+            setSelectedPage(newPage);
+          }
         }
       }, 100); // 약간의 지연으로 YJS 동기화 시간을 고려
     }
@@ -105,7 +122,8 @@ const PageList: React.FC = () => {
     }
   };
 
-  const handleStartEditing = (
+  // 더블클릭으로 이름 편집 시작
+  const handleDoubleClick = (
     pageId: string,
     currentName: string,
     e: React.MouseEvent,
@@ -117,7 +135,6 @@ const PageList: React.FC = () => {
 
   const handleSavePageName = () => {
     if (!editingPageId || !session || !editingName.trim()) return;
-
     renamePage(editingPageId, editingName, session);
     setEditingPageId(null);
   };
@@ -135,8 +152,8 @@ const PageList: React.FC = () => {
       <div className="h-[90%] overflow-y-auto">
         <div className="flex w-full flex-col gap-2 overflow-y-auto">
           {pages
-            .sort((a, b) => a.index - b.index)
-            .map((page, index) => (
+            .sort((a: any, b: any) => a.index - b.index)
+            .map((page: any, index: any) => (
               <div
                 key={page.id}
                 draggable
@@ -169,17 +186,15 @@ const PageList: React.FC = () => {
                   />
                 ) : (
                   <>
-                    <div className="flex-grow truncate">{page.name}</div>
+                    <div
+                      className="flex-grow truncate"
+                      onDoubleClick={(e) =>
+                        handleDoubleClick(page.id, page.name, e)
+                      }
+                    >
+                      {page.name}
+                    </div>
                     <div className="ml-2 flex items-center space-x-1">
-                      <button
-                        onClick={(e) =>
-                          handleStartEditing(page.id, page.name, e)
-                        }
-                        className="text-xs opacity-50 hover:opacity-100"
-                        title="페이지 이름 변경"
-                      >
-                        ✏️
-                      </button>
                       <button
                         onClick={(e) => handleDeletePage(page.id, e)}
                         className="text-xs opacity-50 hover:opacity-100"

@@ -289,3 +289,91 @@ export const savePagesWithCanvasesAndLayers = async (
     }
   });
 };
+
+/**
+ * 프로젝트 내에 새로운 페이지, 캔버스, 레이어를 순차적으로 생성하는 함수
+ * @param {string} projectId - 프로젝트 ID
+ * @param {Object} pageData - 페이지 생성 데이터
+ */
+export const createNewPageWithDefaults = async (
+  projectId: string,
+  pageData: {
+    id: string;
+    name: string;
+    created_user_id: string;
+    updated_user_id: string;
+  },
+) => {
+  try {
+    console.log("페이지 저장");
+    console.log(pageData);
+    const result = await mongo.$transaction(async (tx) => {
+      // 기존 페이지 수 계산하여 인덱스 설정
+      const existingPagesCount = await tx.page.count({
+        where: { project_id: projectId },
+      });
+
+      // 1. 새 페이지 생성
+      const newPage = await tx.page.create({
+        data: {
+          name: pageData.name,
+          index: existingPagesCount, // 기존 페이지 개수를 인덱스로 사용 (맨 뒤에 추가)
+          project_id: projectId,
+          created_user_id: pageData.created_user_id,
+          updated_user_id: pageData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 2. 기본 캔버스 생성
+      const defaultCanvas = await tx.canvas.create({
+        data: {
+          name: "캔버스 1",
+          index: 0,
+          page_id: newPage.id,
+          created_user_id: pageData.created_user_id,
+          updated_user_id: pageData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      const defaultLayer = await tx.layer.create({
+        data: {
+          name: "레이어 1",
+          index: 0,
+          canvas_id: defaultCanvas.id,
+          created_user_id: pageData.created_user_id,
+          updated_user_id: pageData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 4. 결과 객체 조립
+      const completePage: PageWithCanvases = {
+        ...newPage,
+        page_canvases: [
+          {
+            ...defaultCanvas,
+            canvas_layers: [defaultLayer],
+          },
+        ],
+      };
+
+      return completePage;
+    });
+
+    return {
+      success: true,
+      page: result,
+    };
+  } catch (error) {
+    console.error("페이지 생성 중 오류 발생:", error);
+    return {
+      success: false,
+      error: "페이지 생성에 실패했습니다.",
+    };
+  }
+};

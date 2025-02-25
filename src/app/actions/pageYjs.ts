@@ -3,7 +3,11 @@ import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { SOCKET_URL } from "~/constants/socket";
 import { getDefaultStore } from "jotai";
-import { pageYdocAtom, yProvidersAtom } from "~/store/yjsAtoms";
+import {
+  pageYdocAtom,
+  projectSocketAtom,
+  yProvidersAtom,
+} from "~/store/yjsAtoms";
 import { Socket } from "socket.io-client";
 import {
   currentCanvasAtom,
@@ -25,6 +29,9 @@ export const initPageYjs = (
   project: string,
   session: Session,
 ) => {
+  // 소켓 인스턴스 저장
+  store.set(projectSocketAtom, socket);
+
   // 페이지 동기화 아톰 초기화
   const ydoc = new Y.Doc();
   store.set(pageYdocAtom, ydoc);
@@ -90,29 +97,46 @@ export const initPageYjs = (
     },
   );
 
-  // 변경 사항 감지 및 Jotai 상태 업데이트
   yPagesMap.observe((event) => {
     console.log("변경 감지!!");
-    // Y.Map 변경 감지 후 정렬된 배열로 변환
+
+    // 1. 단순히 인덱스만 바뀐 경우를 판단하기 위한 변수
+    let isOnlyIndexChange = true;
+    let hasAddOrDelete = false;
+
+    // 변경 항목 분석
+    event.changes.keys.forEach((change, key) => {
+      if (change.action === "add" || change.action === "delete") {
+        hasAddOrDelete = true;
+        isOnlyIndexChange = false;
+      }
+    });
+
+    // 2. Y.Map 변경 감지 후 정렬된 배열로 변환
     const pages = Array.from(yPagesMap.values()).sort(
       (a, b) => a.index - b.index,
     );
+
+    // 3. Jotai 상태 업데이트
     store.set(pageCanvasInformationAtom, pages);
     store.set(pagesUpdatedAtom, true);
 
-    // 변경 플래그 리셋
+    // 4. 변경 플래그 리셋
     setTimeout(() => {
       store.set(pagesUpdatedAtom, false);
     }, 2000);
 
-    // 서버에 변경사항 저장 요청
-    socket!.emit("savePages", {
-      project,
-      pages: pages.map((page, index) => ({
-        ...page,
-        index,
-      })),
-    });
+    // 5. 순서 변경 작업인 경우에만 savePages 호출
+    if (isOnlyIndexChange || hasAddOrDelete) {
+      // 서버에 변경사항 저장 요청
+      socket!.emit("savePages", {
+        project,
+        pages: pages.map((page) => ({
+          ...page,
+          // 인덱스는 이미 정렬로 설정되었으므로 그대로 사용
+        })),
+      });
+    }
   });
 };
 
@@ -124,7 +148,7 @@ export const getYPagesMap = () => {
   return ydoc ? ydoc.getMap<PageWithCanvases>("pagesMap") : null;
 };
 
-// 페이지 순서 변경 함수
+//페이지 순서 변경 함수
 export const reorderPages = (sourceIndex: number, destinationIndex: number) => {
   const yPagesMap = getYPagesMap();
   if (!yPagesMap) return;
@@ -141,31 +165,41 @@ export const reorderPages = (sourceIndex: number, destinationIndex: number) => {
   const movingPage = pages[sourceIndex];
   if (!movingPage) return;
 
+  // 복사본 만들기를 방지하기 위해 트랜잭션을 사용하고,
+  // 전체 페이지 배열을 새로 정렬하는 방식으로 접근
   doc.transact(() => {
-    // 페이지 순서 재정렬
-    if (sourceIndex < destinationIndex) {
-      // 아래로 이동: 사이에 있는 항목들 인덱스 감소
-      for (let i = sourceIndex + 1; i <= destinationIndex; i++) {
-        const page = pages[i];
-        page!.index = i - 1;
-        yPagesMap.set(page!.id, page!);
-      }
-    } else {
-      // 위로 이동: 사이에 있는 항목들 인덱스 증가
-      for (let i = destinationIndex; i < sourceIndex; i++) {
-        const page = pages[i];
-        page!.index = i + 1;
-        yPagesMap.set(page!.id, page!);
-      }
-    }
+    // 먼저 이동할 페이지를 배열에서 제거
+    const newPages = [...pages];
+    newPages.splice(sourceIndex, 1);
 
-    // 이동된 페이지 인덱스 업데이트
-    movingPage.index = destinationIndex;
-    yPagesMap.set(movingPage.id, movingPage);
+    // 대상 위치에 페이지 삽입
+    newPages.splice(destinationIndex, 0, movingPage);
+
+    // 전체 페이지 인덱스 재할당
+    newPages.forEach((page, index) => {
+      // 원본 객체의 인덱스만 수정하고 Y.Map에 업데이트
+      const updatedPage = { ...page, index };
+      yPagesMap.set(page.id, updatedPage);
+    });
   });
+
+  // 서버에 변경 내용 즉시 저장 요청 (선택사항)
+  const socket = store.get(projectSocketAtom);
+  const project = movingPage.project_id;
+  if (socket && project) {
+    // Y.Map에서 현재 정렬된 페이지 목록 가져오기
+    const updatedPages = Array.from(yPagesMap.values()).sort(
+      (a, b) => a.index - b.index,
+    );
+
+    socket.emit("savePages", {
+      project,
+      pages: updatedPages,
+    });
+  }
 };
 
-// 페이지 추가 함수
+// 페이지 추가 함수 (수정된 버전)
 export const addPage = (
   pageName: string,
   session: Session,
@@ -173,48 +207,55 @@ export const addPage = (
 ) => {
   const yPagesMap = getYPagesMap();
   if (!yPagesMap) return null;
-
+  let newPageId = "aaaa";
   const doc = getPageYdoc();
   if (!doc) return null;
 
-  // 기존 페이지 수 확인
-  const pages = Array.from(yPagesMap.values());
-  const pageCount = pages.length;
+  // 소켓을 통해 서버에 새 페이지 생성 요청
+  const socket = store.get(projectSocketAtom); // 소켓 인스턴스 가져오기
 
-  // 기본 캔버스 레이어 생성
-  const defaultLayer = {
-    id: generateUniqueId(),
-    name: "레이어 1",
-    visible: true,
-    locked: false,
-    index: 0,
-    shapes: [],
-  };
+  socket?.emit(
+    "createNewPage",
+    {
+      project: projectId,
+      pageData: {
+        name: pageName,
+        created_user_id: session.user.id,
+        updated_user_id: session.user.id,
+      },
+    },
+    (response: any) => {
+      if (response.success) {
+        // 서버에서 생성 성공 시, 로컬 Y.doc에 추가
+        const newPage = response.page;
+        newPageId = newPage.id;
+        doc.transact(() => {
+          yPagesMap.set(newPage.id, newPage);
+        });
 
-  // 기본 캔버스 생성
-  const defaultCanvas = {
-    id: generateUniqueId(),
-    name: "캔버스 1",
-    index: 0,
-    canvas_layers: [defaultLayer],
-  };
+        // 옵션: 현재 페이지로 설정
+        store.set(currentPageAtom, newPage);
 
-  const newPageId = generateUniqueId();
-  const newPage: PageWithCanvases = {
-    id: newPageId,
-    name: pageName,
-    index: pageCount, // 맨 뒤에 추가
-    created_at: new Date(),
-    created_user_id: session.user.id,
-    updated_at: new Date(),
-    updated_user_id: session.user.id,
-    project_id: projectId,
-    page_canvases: [], // 기본 캔버스 추가
-  };
+        if (newPage.page_canvases?.length > 0) {
+          store.set(currentCanvasesAtom, newPage.page_canvases);
+          store.set(currentCanvasAtom, newPage.page_canvases[0]);
 
-  doc.transact(() => {
-    yPagesMap.set(newPageId, newPage);
-  });
+          if (newPage.page_canvases[0]?.canvas_layers?.length > 0) {
+            store.set(
+              currentLayersAtom,
+              newPage.page_canvases[0].canvas_layers,
+            );
+            store.set(
+              currentLayerAtom,
+              newPage.page_canvases[0].canvas_layers[0],
+            );
+          }
+        }
+      } else {
+        console.error("페이지 생성 실패:", response.error);
+      }
+    },
+  );
 
   return newPageId;
 };
@@ -299,7 +340,6 @@ export const renamePage = (
   if (!doc) return null;
   const yPagesMap = getYPagesMap();
   if (!yPagesMap) return;
-
   const page = yPagesMap.get(pageId);
   if (!page) return;
 

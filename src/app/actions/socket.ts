@@ -37,11 +37,11 @@ export const initProjectSocket = async (project: string, session: Session) => {
 
 export const disconnectSocket = async () => {
   // // YJS 프로바이더 정리
-  // const providers = store.get(yProvidersAtom);
-  // Object.values(providers).forEach((provider) => {
-  //   provider.disconnect();
-  // });
-  // store.set(yProvidersAtom, {});
+  const providers = store.get(yProvidersAtom);
+  Object.values(providers).forEach((provider) => {
+    provider.disconnect();
+  });
+  store.set(yProvidersAtom, {});
   if (socket) {
     console.log("소켓 연결 종료");
     socket.removeAllListeners();
