@@ -47,7 +47,7 @@ const Main: React.FC = () => {
   }
 
   return (
-    <div className="my-10 grid h-full grid-cols-1 gap-12 rounded-xl bg-neutral-700 p-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+    <div className="my-10 grid h-full grid-cols-1 gap-x-12 gap-y-4 rounded-xl bg-neutral-700 p-8 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
       {projects.length > 0 ? (
         projects.map((project) => (
           <div

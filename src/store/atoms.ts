@@ -23,11 +23,17 @@ export const currentProjectAtom = atom<Project>();
 // 현재 접속 프로젝트의 페이지 및 캔버스 정보
 export const pageCanvasInformationAtom = atom<PageWithCanvases[]>([]);
 
+// 페이지 리스트
+export const pagesAtom = atom<Page[]>([]);
+
+// 페이지별 캔버스 리스트
+export const pageCanvasesAtom = atom<Record<string, CanvasWithLayers[]>>({});
+
 // 페이지 변경 여부
 export const pagesUpdatedAtom = atom<boolean>(false);
 
 //현재 사용자가 선택한 페이지
-export const currentPageAtom = atom<PageWithCanvases>();
+export const currentPageAtom = atom<Page>();
 
 //현재 사용자가 선택한 페이지의 캔버스 리스트
 export const currentCanvasesAtom = atom<CanvasWithLayers[]>([]);

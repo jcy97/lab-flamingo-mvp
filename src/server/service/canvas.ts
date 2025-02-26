@@ -44,252 +44,29 @@ export const selectPagesWithCanvases = async (projectId: string) => {
 };
 
 /**
- * 프로젝트의 페이지들과 관련 캔버스, 레이어를 저장하는 함수
+ * 페이지 순서(인덱스)만 업데이트하는 함수
  * @param {string} projectId - 프로젝트 ID
- * @param {Array} pages - 저장할 페이지 배열
+ * @param {Array} pages - 순서가 변경된 페이지 배열 (기본 정보만 포함)
  */
-export const savePagesWithCanvasesAndLayers = async (
+export const updatePagesOrder = async (
   projectId: string,
-  pages: PageWithCanvases[],
+  pages: { id: string; index: number }[],
 ) => {
-  // 프로젝트에 속한 현재 DB의 모든 페이지 조회
-  const existingPages = await mongo.page.findMany({
-    where: { project_id: projectId },
-    include: {
-      page_canvases: {
-        include: {
-          canvas_layers: true,
-        },
-      },
-    },
-  });
-
-  // 기존 페이지 ID 맵
-  const existingPageMap = new Map(existingPages.map((page) => [page.id, page]));
-
-  // 현재 요청에 포함된 페이지 ID 집합
-  const currentPageIds = new Set(pages.map((page) => page.id));
-
-  // 트랜잭션으로 모든 작업 수행
+  // 트랜잭션으로 모든 페이지 인덱스 업데이트
   await mongo.$transaction(async (tx) => {
-    // 1. 삭제된 페이지 처리 (요청에 없는 기존 페이지)
-    for (const existingPage of existingPages) {
-      if (!currentPageIds.has(existingPage.id)) {
-        // 삭제된 페이지의 캔버스와 레이어 제거
-        for (const canvas of existingPage.page_canvases) {
-          await tx.layer.deleteMany({
-            where: { canvas_id: canvas.id },
-          });
-        }
-
-        await tx.canvas.deleteMany({
-          where: { page_id: existingPage.id },
-        });
-
-        await tx.page.delete({
-          where: { id: existingPage.id },
-        });
-      }
-    }
-
-    // 2. 페이지 생성/업데이트 처리
     for (const page of pages) {
-      const existingPage = existingPageMap.get(page.id);
-
-      if (!existingPage) {
-        // 2-1. 신규 페이지 생성
-        const newPage = await tx.page.create({
-          data: {
-            id: page.id,
-            name: page.name,
-            index: page.index,
-            created_at: page.created_at,
-            created_user_id: page.created_user_id,
-            updated_at: page.updated_at || new Date(),
-            updated_user_id: page.updated_user_id,
-            project_id: projectId,
-          },
-        });
-
-        // 새 페이지의 캔버스 생성
-        if (page.page_canvases && page.page_canvases.length > 0) {
-          for (const canvas of page.page_canvases) {
-            const newCanvas = await tx.canvas.create({
-              data: {
-                id: canvas.id,
-                name: canvas.name,
-                index: canvas.index,
-                created_at: canvas.created_at,
-                created_user_id: canvas.created_user_id,
-                updated_at: canvas.updated_at || new Date(),
-                updated_user_id: canvas.updated_user_id,
-                page_id: newPage.id,
-              },
-            });
-
-            // 새 캔버스의 레이어 생성
-            if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
-              for (const layer of canvas.canvas_layers) {
-                await tx.layer.create({
-                  data: {
-                    name: layer.name,
-                    index: layer.index,
-                    created_at: layer.created_at,
-                    created_user_id: layer.created_user_id,
-                    updated_at: layer.updated_at || new Date(),
-                    updated_user_id: layer.updated_user_id,
-                    canvas_id: newCanvas.id,
-                  },
-                });
-              }
-            }
-          }
-        }
-      } else {
-        // 2-2. 기존 페이지 업데이트
-        await tx.page.update({
-          where: { id: page.id },
-          data: {
-            name: page.name,
-            index: page.index,
-            updated_at: page.updated_at || new Date(),
-            updated_user_id: page.updated_user_id,
-          },
-        });
-
-        // 기존 캔버스 ID 맵
-        const existingCanvasMap = new Map(
-          existingPage.page_canvases.map((canvas) => [canvas.id, canvas]),
-        );
-
-        // 현재 요청에 포함된 캔버스 ID 집합
-        const currentCanvasIds = new Set(
-          (page.page_canvases || []).map((canvas) => canvas.id),
-        );
-
-        // 2-2-1. 삭제된 캔버스 처리
-        for (const existingCanvas of existingPage.page_canvases) {
-          if (!currentCanvasIds.has(existingCanvas.id)) {
-            // 캔버스 레이어 삭제
-            await tx.layer.deleteMany({
-              where: { canvas_id: existingCanvas.id },
-            });
-
-            // 캔버스 삭제
-            await tx.canvas.delete({
-              where: { id: existingCanvas.id },
-            });
-          }
-        }
-
-        // 2-2-2. 캔버스 생성/업데이트
-        if (page.page_canvases && page.page_canvases.length > 0) {
-          for (const canvas of page.page_canvases) {
-            const existingCanvas = existingCanvasMap.get(canvas.id);
-
-            if (!existingCanvas) {
-              // 신규 캔버스 생성
-              const newCanvas = await tx.canvas.create({
-                data: {
-                  id: canvas.id,
-                  name: canvas.name,
-                  index: canvas.index,
-                  created_at: canvas.created_at,
-                  created_user_id: canvas.created_user_id,
-                  updated_at: canvas.updated_at || new Date(),
-                  updated_user_id: canvas.updated_user_id,
-                  page_id: page.id,
-                },
-              });
-
-              // 레이어 생성
-              if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
-                for (const layer of canvas.canvas_layers) {
-                  await tx.layer.create({
-                    data: {
-                      name: layer.name,
-                      index: layer.index,
-                      created_at: layer.created_at,
-                      created_user_id: layer.created_user_id,
-                      updated_at: layer.updated_at || new Date(),
-                      updated_user_id: layer.updated_user_id,
-                      canvas_id: newCanvas.id,
-                    },
-                  });
-                }
-              }
-            } else {
-              // 캔버스 업데이트
-              await tx.canvas.update({
-                where: { id: canvas.id },
-                data: {
-                  name: canvas.name,
-                  index: canvas.index,
-                  updated_at: canvas.updated_at || new Date(),
-                  updated_user_id: canvas.updated_user_id,
-                },
-              });
-
-              // 기존 레이어 ID 맵
-              const existingLayerMap = new Map(
-                existingCanvas.canvas_layers.map((layer) => [layer.id, layer]),
-              );
-
-              // 현재 요청에 포함된 레이어 ID 집합
-              const currentLayerIds = new Set(
-                (canvas.canvas_layers || []).map((layer) => layer.id),
-              );
-
-              // 삭제된 레이어 처리
-              for (const existingLayer of existingCanvas.canvas_layers) {
-                if (!currentLayerIds.has(existingLayer.id)) {
-                  // 레이어 삭제
-                  await tx.layer.delete({
-                    where: { id: existingLayer.id },
-                  });
-                }
-              }
-
-              // 레이어 생성/업데이트
-              if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
-                for (const layer of canvas.canvas_layers) {
-                  const existingLayer = existingLayerMap.get(layer.id);
-
-                  if (!existingLayer) {
-                    // 신규 레이어 생성
-                    await tx.layer.create({
-                      data: {
-                        name: layer.name,
-                        index: layer.index,
-                        created_at: layer.created_at,
-                        created_user_id: layer.created_user_id,
-                        updated_at: layer.updated_at || new Date(),
-                        updated_user_id: layer.updated_user_id,
-                        canvas_id: canvas.id,
-                      },
-                    });
-                  } else {
-                    // 레이어 업데이트
-                    await tx.layer.update({
-                      where: { id: layer.id },
-                      data: {
-                        name: layer.name,
-                        index: layer.index,
-                        updated_at: layer.updated_at || new Date(),
-                        updated_user_id: layer.updated_user_id,
-                      },
-                    });
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+      await tx.page.update({
+        where: { id: page.id },
+        data: {
+          index: page.index,
+          updated_at: new Date(),
+        },
+      });
     }
   });
-};
 
+  return true;
+};
 /**
  * 프로젝트 내에 새로운 페이지, 캔버스, 레이어를 순차적으로 생성하는 함수
  * @param {string} projectId - 프로젝트 ID
@@ -317,7 +94,7 @@ export const createNewPageWithDefaults = async (
       const newPage = await tx.page.create({
         data: {
           name: pageData.name,
-          index: existingPagesCount, // 기존 페이지 개수를 인덱스로 사용 (맨 뒤에 추가)
+          index: existingPagesCount + 1, // 기존 페이지 개수를 인덱스로 사용 (맨 뒤에 추가)
           project_id: projectId,
           created_user_id: pageData.created_user_id,
           updated_user_id: pageData.updated_user_id,
@@ -526,6 +303,252 @@ export const deletePage = async (pageId: string) => {
     return {
       success: false,
       error: "페이지 삭제에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 캔버스 정보를 업데이트하는 함수
+ *
+ * @param {string} canvasId - 업데이트할 캔버스의 ID
+ * @param {Object} updates - 업데이트할 데이터 (이름, 업데이트 시간, 업데이트한 사용자 ID 등)
+ * @returns {Promise<Object>} - 업데이트된 캔버스 정보와 성공 여부
+ */
+export const updateCanvas = async (
+  canvasId: string,
+  updates: {
+    name?: string;
+    index?: number;
+    updated_user_id?: string;
+  },
+) => {
+  try {
+    // 캔버스 정보 업데이트
+    const updatedCanvas = await mongo.canvas.update({
+      where: { id: canvasId },
+      data: {
+        // 제공된 업데이트 필드만 적용
+        ...(updates.name && { name: updates.name }),
+        ...(updates.index !== undefined && { index: updates.index }),
+        // 항상 서버 측에서 새 Date 객체 생성하여 사용
+        updated_at: new Date(),
+        ...(updates.updated_user_id && {
+          updated_user_id: updates.updated_user_id,
+        }),
+      },
+      include: {
+        canvas_layers: {
+          orderBy: {
+            index: "asc",
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      canvas: updatedCanvas,
+    };
+  } catch (error) {
+    console.error("캔버스 업데이트 실패:", error);
+    return {
+      success: false,
+      error: "캔버스 업데이트에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 프로젝트 내 특정 페이지에 새로운 캔버스와 기본 레이어를 생성하는 함수
+ * @param {string} pageId - 캔버스를 생성할 페이지 ID
+ * @param {Object} canvasData - 캔버스 생성 데이터
+ */
+export const createCanvas = async (
+  pageId: string,
+  canvasData: {
+    name: string | number;
+    created_user_id: string;
+    updated_user_id: string;
+  },
+) => {
+  try {
+    const result = await mongo.$transaction(async (tx) => {
+      // 기존 캔버스 수 계산하여 인덱스 설정
+      const existingCanvasCount = await tx.canvas.count({
+        where: { page_id: pageId },
+      });
+
+      // 1. 새 캔버스 생성
+      const newCanvas = await tx.canvas.create({
+        data: {
+          name: `캔버스 ${canvasData.name || existingCanvasCount + 1}`,
+          index: existingCanvasCount, // 기존 캔버스 개수를 인덱스로 사용 (맨 뒤에 추가)
+          page_id: pageId,
+          created_user_id: canvasData.created_user_id,
+          updated_user_id: canvasData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 2. 기본 레이어 생성
+      const defaultLayer = await tx.layer.create({
+        data: {
+          name: "레이어 1",
+          index: 0,
+          canvas_id: newCanvas.id,
+          created_user_id: canvasData.created_user_id,
+          updated_user_id: canvasData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 3. 생성된 캔버스와 레이어 정보를 포함하여 반환
+      return {
+        ...newCanvas,
+        canvas_layers: [defaultLayer],
+      };
+    });
+
+    return {
+      success: true,
+      canvas: result,
+    };
+  } catch (error) {
+    console.error("캔버스 생성 중 오류 발생:", error);
+    return {
+      success: false,
+      error: "캔버스 생성에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 특정 페이지 내의 캔버스 순서를 재정렬하는 함수
+ * @param {string} pageId - 페이지 ID
+ * @param {string[]} canvasIds - 순서가 변경된 캔버스 ID 배열 (새로운 순서대로)
+ * @returns {Promise<Object>} - 재정렬 작업 결과와 성공 여부
+ */
+export const reorderCanvases = async (pageId: string, canvasIds: string[]) => {
+  try {
+    // 트랜잭션으로 모든 캔버스 인덱스 업데이트
+    await mongo.$transaction(async (tx) => {
+      // 각 캔버스의 인덱스를 새 순서에 맞게 업데이트
+      for (let index = 0; index < canvasIds.length; index++) {
+        await tx.canvas.update({
+          where: {
+            id: canvasIds[index],
+            page_id: pageId, // 페이지 ID 확인 (안전장치)
+          },
+          data: {
+            index: index, // 새 인덱스 값 설정
+            updated_at: new Date(), // 업데이트 시간 갱신
+          },
+        });
+      }
+    });
+
+    // 업데이트된 캔버스 목록 조회
+    const updatedCanvases = await mongo.canvas.findMany({
+      where: { page_id: pageId },
+      orderBy: { index: "asc" },
+      include: {
+        canvas_layers: {
+          orderBy: { index: "asc" },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      pageId,
+      canvases: updatedCanvases,
+    };
+  } catch (error) {
+    console.error("캔버스 순서 재정렬 실패:", error);
+    return {
+      success: false,
+      error: "캔버스 순서 재정렬에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 특정 캔버스와 관련된 모든 레이어를 삭제하는 함수
+ *
+ * @param {string} canvasId - 삭제할 캔버스의 ID
+ * @returns {Promise<Object>} - 삭제 작업 결과와 성공 여부
+ */
+export const deleteCanvas = async (canvasId: string) => {
+  try {
+    // 삭제 전에 캔버스 정보를 먼저 조회 (페이지 ID와 인덱스를 얻기 위함)
+    const canvasToDelete = await mongo.canvas.findUnique({
+      where: { id: canvasId },
+      include: {
+        canvas_layers: true,
+      },
+    });
+
+    if (!canvasToDelete) {
+      return {
+        success: false,
+        error: "삭제할 캔버스를 찾을 수 없습니다.",
+      };
+    }
+
+    // 페이지 ID 저장
+    const pageId = canvasToDelete.page_id;
+    const canvasIndex = canvasToDelete.index;
+
+    // 트랜잭션으로 모든 관련 리소스를 원자적으로 삭제
+    await mongo.$transaction(async (tx) => {
+      // 1. 캔버스에 속한 모든 레이어 삭제
+      await tx.layer.deleteMany({
+        where: { canvas_id: canvasId },
+      });
+
+      // 2. 캔버스 삭제
+      await tx.canvas.delete({
+        where: { id: canvasId },
+      });
+
+      // 3. 동일 페이지 내 다른 캔버스들의 인덱스 조정
+      // 삭제된 캔버스보다 인덱스가 큰 캔버스들의 인덱스를 1씩 감소
+      await tx.canvas.updateMany({
+        where: {
+          page_id: pageId,
+          index: { gt: canvasIndex },
+        },
+        data: {
+          index: { decrement: 1 },
+          updated_at: new Date(),
+        },
+      });
+    });
+
+    // 삭제 후 페이지에 속한 모든 캔버스 조회
+    const remainingCanvases = await mongo.canvas.findMany({
+      where: { page_id: pageId },
+      orderBy: { index: "asc" },
+      include: {
+        canvas_layers: {
+          orderBy: { index: "asc" },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      deletedCanvasId: canvasId,
+      pageId: pageId,
+      remainingCanvases: remainingCanvases,
+    };
+  } catch (error) {
+    console.error("캔버스 삭제 실패:", error);
+    return {
+      success: false,
+      error: "캔버스 삭제에 실패했습니다.",
     };
   }
 };

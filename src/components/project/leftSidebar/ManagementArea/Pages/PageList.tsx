@@ -4,20 +4,17 @@ import {
   currentCanvasAtom,
   currentCanvasesAtom,
   currentPageAtom,
-  pageCanvasInformationAtom,
+  pageCanvasesAtom,
+  pagesAtom,
   pageSelectedCanvasMapAtom,
   pagesUpdatedAtom,
 } from "~/store/atoms";
-import {
-  getYPagesMap,
-  reorderPages,
-  deletePage,
-  renamePage,
-} from "~/app/actions/pageYjs";
+import { reorderPages, deletePage, renamePage } from "~/app/actions/pageYjs";
 import { useSession } from "next-auth/react";
+import { initCanvasesMap } from "~/app/actions/canvasYjs";
 
 const PageList: React.FC = () => {
-  const [pages, setPages] = useAtom(pageCanvasInformationAtom);
+  const [pages, setPages] = useAtom(pagesAtom);
   const [selectedPage, setSelectedPage] = useAtom(currentPageAtom);
   const pagesUpdated = useAtomValue(pagesUpdatedAtom);
   const [selectedCanvasMap, setSelectedCanvasMap] = useAtom(
@@ -25,6 +22,8 @@ const PageList: React.FC = () => {
   );
   const setCurrentCanvases = useSetAtom(currentCanvasesAtom);
   const [currentCanvas, setCurrentCanvas] = useAtom(currentCanvasAtom);
+  const currentPageCanvases = useAtomValue(pageCanvasesAtom);
+
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -35,14 +34,15 @@ const PageList: React.FC = () => {
   useEffect(() => {
     if (selectedPage) {
       // 현재 페이지의 캔버스 목록 설정
-      setCurrentCanvases(selectedPage.page_canvases);
+      setCurrentCanvases(currentPageCanvases[selectedPage.id]!);
+      initCanvasesMap(currentPageCanvases[selectedPage.id]!);
 
       // 이전에 이 페이지에서 선택한 캔버스가 있는지 확인
       const previouslySelectedCanvasId = selectedCanvasMap[selectedPage.id];
 
       if (previouslySelectedCanvasId) {
         // 이전에 선택한 캔버스를 찾아 설정
-        const previousCanvas = selectedPage.page_canvases.find(
+        const previousCanvas = currentPageCanvases[selectedPage.id]!.find(
           (canvas) => canvas.id === previouslySelectedCanvasId,
         );
 
@@ -51,18 +51,18 @@ const PageList: React.FC = () => {
         } else {
           // 이전 캔버스를 찾을 수 없는 경우 (삭제되었을 수 있음)
           // 첫 번째 캔버스를 기본값으로 설정
-          if (selectedPage.page_canvases.length > 0) {
-            setCurrentCanvas(selectedPage.page_canvases[0]);
+          if (currentPageCanvases[selectedPage.id]!.length > 0) {
+            setCurrentCanvas(currentPageCanvases[selectedPage.id]![0]);
           }
         }
       } else {
         // 이전에 선택한 캔버스가 없는 경우 첫 번째 캔버스를 기본값으로 설정
-        if (selectedPage.page_canvases.length > 0) {
-          setCurrentCanvas(selectedPage.page_canvases[0]);
+        if (currentPageCanvases[selectedPage.id]!.length > 0) {
+          setCurrentCanvas(currentPageCanvases[selectedPage.id]![0]);
         }
       }
     }
-  }, [selectedPage, setCurrentCanvases, selectedCanvasMap, setCurrentCanvas]);
+  }, [selectedPage]);
 
   // 캔버스 선택 상태가 변경될 때마다 맵 업데이트
   useEffect(() => {

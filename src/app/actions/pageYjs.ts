@@ -3,12 +3,8 @@ import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { SOCKET_URL } from "~/constants/socket";
 import { getDefaultStore } from "jotai";
-import {
-  pageYdocAtom,
-  projectSocketAtom,
-  yProvidersAtom,
-} from "~/store/yjsAtoms";
-import { Socket } from "socket.io-client";
+import { pageYdocAtom, projectSocketAtom } from "~/store/yjsAtoms";
+import { Page } from "@prisma/mongodb-client";
 import {
   currentCanvasAtom,
   currentCanvasesAtom,
@@ -16,7 +12,9 @@ import {
   currentLayersAtom,
   currentPageAtom,
   isLoadingAtom,
+  pageCanvasesAtom,
   pageCanvasInformationAtom,
+  pagesAtom,
   pagesUpdatedAtom,
   PageWithCanvases,
   projectLoadingAtom,
@@ -24,69 +22,88 @@ import {
 
 const store = getDefaultStore();
 
-export const initPageYjs = (
-  socket: Socket,
-  project: string,
-  session: Session,
-) => {
-  // 소켓 인스턴스 저장
-  store.set(projectSocketAtom, socket);
-
+export const initPageYjs = (project: string, session: Session) => {
   // 페이지 동기화 아톰 초기화
   const ydoc = new Y.Doc();
   store.set(pageYdocAtom, ydoc);
 
+  const socket = store.get(projectSocketAtom);
+
   // 웹소켓 연결
-  const wsProvider = new SocketIOProvider(SOCKET_URL, project, ydoc, socket);
+  const wsProvider = new SocketIOProvider(
+    SOCKET_URL,
+    `page-${project}`,
+    ydoc,
+    socket!,
+  );
 
   // 페이지 관리용 맵 생성
-  const yPagesMap = ydoc.getMap<PageWithCanvases>("pagesMap");
+  const yPagesMap = ydoc.getMap<Page>("pagesMap");
 
   wsProvider.on("status", ({ status }: { status: string }) => {
     console.log(status); // Logs "connected" or "disconnected"
   });
+  type PageType = Omit<PageWithCanvases, "page_canvases">;
 
-  // 초기 상태 설정 - 서버에서 로드된 데이터가 있을 경우
+  // 서버 데이터와 YJS 동기화 함수
   socket!.emit(
     "getProjectPages",
     { project },
     (initialPages: PageWithCanvases[]) => {
       // 서버로부터 페이지 리스트 가져오기
-      if (initialPages && initialPages.length > 0 && yPagesMap.size === 0) {
-        // 초기 데이터가 있고 로컬 문서에 데이터가 없는 경우에만 설정
-        const sortedPages = initialPages.sort((a, b) => a.index - b.index);
+      if (initialPages && initialPages.length > 0) {
+        const sortedPages = initialPages
+          .sort((a, b) => a.index - b.index)
+          .map(({ page_canvases, ...rest }) => {
+            // 페이지별 캔버스 리스트 저장
+            store.set(pageCanvasesAtom, (prev) => ({
+              ...prev,
+              [rest.id]: page_canvases,
+            }));
+            return rest;
+          });
 
-        // Y.Map에 페이지들 추가
+        // YJS 데이터를 서버 데이터로 완전히 동기화
         ydoc.transact(() => {
+          // 기존 YJS 맵의 모든 페이지 ID 수집
+          const existingPageIds = new Set(yPagesMap.keys());
+
+          // 서버에서 가져온 페이지 추가/업데이트
           sortedPages.forEach((page) => {
             yPagesMap.set(page.id, page);
+            existingPageIds.delete(page.id); // 처리된 ID는 세트에서 제거
+          });
+
+          // 서버에 없는 페이지는 YJS에서도 제거
+          existingPageIds.forEach((pageId) => {
+            yPagesMap.delete(pageId);
           });
         });
-      }
 
-      // Jotai 상태 초기화 - 정렬된 페이지 배열로 변환
-      const pages = Array.from(yPagesMap.values()).sort(
-        (a, b) => a.index - b.index,
-      );
-      store.set(pageCanvasInformationAtom, pages);
+        // Jotai 상태 초기화 - 정렬된 페이지 배열로 변환
+        const pages = Array.from(yPagesMap.values()).sort(
+          (a, b) => a.index - b.index,
+        );
 
-      // 초기 페이지 설정
-      if (pages.length > 0) {
-        store.set(currentPageAtom, pages[0]);
+        store.set(pageCanvasInformationAtom, initialPages);
+        // 초기 페이지 설정
+        if (pages.length > 0) {
+          store.set(currentPageAtom, initialPages[0]);
 
-        if (pages[0]!.page_canvases?.length > 0) {
-          store.set(currentCanvasesAtom, pages[0]!.page_canvases);
-          store.set(currentCanvasAtom, pages[0]!.page_canvases[0]);
+          if (initialPages[0]!.page_canvases?.length > 0) {
+            store.set(currentCanvasesAtom, initialPages[0]!.page_canvases);
+            store.set(currentCanvasAtom, initialPages[0]!.page_canvases[0]);
 
-          if (pages[0]!.page_canvases[0]!.canvas_layers?.length > 0) {
-            store.set(
-              currentLayersAtom,
-              pages[0]!.page_canvases[0]!.canvas_layers,
-            );
-            store.set(
-              currentLayerAtom,
-              pages[0]!.page_canvases[0]!.canvas_layers[0],
-            );
+            if (initialPages[0]!.page_canvases[0]!.canvas_layers?.length > 0) {
+              store.set(
+                currentLayersAtom,
+                initialPages[0]!.page_canvases[0]!.canvas_layers,
+              );
+              store.set(
+                currentLayerAtom,
+                initialPages[0]!.page_canvases[0]!.canvas_layers[0],
+              );
+            }
           }
         }
       }
@@ -96,9 +113,8 @@ export const initPageYjs = (
       store.set(isLoadingAtom, false);
     },
   );
-
   yPagesMap.observe((event) => {
-    console.log("변경 감지!!");
+    console.log("페이지 변경 감지!!");
 
     // 1. 단순히 인덱스만 바뀐 경우를 판단하기 위한 변수
     let isOnlyIndexChange = true;
@@ -118,7 +134,7 @@ export const initPageYjs = (
     );
 
     // 3. Jotai 상태 업데이트
-    store.set(pageCanvasInformationAtom, pages);
+    store.set(pagesAtom, pages);
     store.set(pagesUpdatedAtom, true);
 
     // 4. 변경 플래그 리셋
@@ -180,7 +196,7 @@ export const reorderPages = (sourceIndex: number, destinationIndex: number) => {
       (a, b) => a.index - b.index,
     );
 
-    socket.emit("savePages", {
+    socket.emit("reorderPages", {
       project,
       pages: updatedPages,
     });
@@ -220,6 +236,12 @@ export const addPage = (
         doc.transact(() => {
           yPagesMap.set(newPage.id, newPage);
         });
+
+        // 새 페이지의 캔버스 정보를 pageCanvasesAtom에 추가
+        store.set(pageCanvasesAtom, (prev) => ({
+          ...prev,
+          [newPage.id]: newPage.page_canvases || [], // 새 페이지 ID를 키로 캔버스 리스트 추가
+        }));
 
         // 옵션: 현재 페이지로 설정
         store.set(currentPageAtom, newPage);
@@ -294,6 +316,11 @@ export const deletePage = (pageId: string) => {
                 yPagesMap.set(page!.id, page!);
               }
             }
+          });
+          store.set(pageCanvasesAtom, (prev) => {
+            const newState = { ...prev }; // 기존 상태 복사
+            delete newState[pageId]; // 특정 페이지 ID의 값을 삭제
+            return newState; // 새로운 상태 반환
           });
 
           // 활성 페이지가 삭제된 경우 다른 페이지로 전환
@@ -404,124 +431,4 @@ export const renamePage = (
       updated_at: new Date(),
     });
   }
-};
-
-// 캔버스 추가 함수
-export const addCanvas = (
-  pageId: string,
-  canvasName: string,
-  session: Session,
-) => {
-  const yPagesMap = getYPagesMap();
-  if (!yPagesMap) return null;
-
-  const doc = getPageYdoc();
-  if (!doc) return null;
-
-  const page = yPagesMap.get(pageId);
-  if (!page) return null;
-
-  // 기본 레이어 생성
-  const defaultLayer = {
-    id: generateUniqueId(),
-    name: "레이어 1",
-    visible: true,
-    locked: false,
-    index: 0,
-    shapes: [],
-  };
-
-  // 캔버스 ID 생성
-  const canvasId = generateUniqueId();
-
-  // 새 캔버스 생성
-  const newCanvas = {
-    id: canvasId,
-    name: canvasName,
-    index: page.page_canvases?.length || 0,
-    created_at: new Date(),
-    created_user_id: session.user.id,
-    updated_at: new Date(),
-    updated_user_id: session.user.id,
-    canvas_layers: [defaultLayer],
-  };
-
-  doc.transact(() => {
-    // 페이지의 캔버스 목록 업데이트
-    const updatedPage = {
-      ...page,
-      page_canvases: [...(page.page_canvases || []), newCanvas],
-    };
-
-    //yPagesMap.set(pageId, updatedPage);
-  });
-
-  return canvasId;
-};
-
-// 레이어 추가 함수
-export const addLayer = (
-  pageId: string,
-  canvasId: string,
-  layerName: string,
-  session: Session,
-) => {
-  const yPagesMap = getYPagesMap();
-  if (!yPagesMap) return null;
-
-  const doc = getPageYdoc();
-  if (!doc) return null;
-
-  const page = yPagesMap.get(pageId);
-  if (!page) return null;
-
-  const canvasIndex =
-    page.page_canvases?.findIndex((c) => c.id === canvasId) ?? -1;
-  if (canvasIndex === -1) return null;
-
-  // 새 레이어 생성
-  const newLayer = {
-    id: generateUniqueId(),
-    name: layerName,
-    visible: true,
-    locked: false,
-    index: page.page_canvases[canvasIndex]!.canvas_layers?.length || 0,
-    shapes: [],
-  };
-
-  doc.transact(() => {
-    // 페이지의 캔버스 목록 복사
-    const updatedCanvases = [...(page.page_canvases || [])];
-
-    // // 특정 캔버스의 레이어 목록 업데이트
-    // updatedCanvases[canvasIndex] = {
-    //   ...updatedCanvases[canvasIndex],
-    //   canvas_layers: [
-    //     ...(updatedCanvases[canvasIndex].canvas_layers || []),
-    //     newLayer,
-    //   ],
-    // };
-
-    // 페이지 업데이트
-    const updatedPage = {
-      ...page,
-      page_canvases: updatedCanvases,
-      updated_at: new Date(),
-      updated_user_id: session.user.id,
-    };
-
-    yPagesMap.set(pageId, updatedPage);
-  });
-
-  return newLayer.id;
-};
-
-// 유틸리티 함수
-function generateUniqueId() {
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
-}
-
-export const getYProvider = (projectId: string) => {
-  const providers = store.get(yProvidersAtom);
-  return providers?.[projectId] || null;
 };

@@ -4,7 +4,8 @@ import { SocketIOProvider } from "y-socket.io";
 import { Socket } from "socket.io-client";
 
 export const pageYdocAtom = atom<Y.Doc | null>(null);
+export const canvasYdocAtom = atom<Y.Doc | null>(null);
 
-export const yProvidersAtom = atom<Record<string, SocketIOProvider>>({});
+export const yPageProvidersAtom = atom<Record<string, SocketIOProvider>>({});
 
 export const projectSocketAtom = atom<Socket | null>(null);
