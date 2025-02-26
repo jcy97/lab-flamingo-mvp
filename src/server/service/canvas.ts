@@ -377,3 +377,155 @@ export const createNewPageWithDefaults = async (
     };
   }
 };
+
+/**
+ * 특정 페이지의 정보를 업데이트하는 함수
+ *
+ * @param {string} pageId - 업데이트할 페이지의 ID
+ * @param {Object} updates - 업데이트할 데이터 (이름, 업데이트 시간, 업데이트한 사용자 ID 등)
+ * @returns {Promise<Object>} - 업데이트된 페이지 정보와 성공 여부
+ */
+export const updatePage = async (
+  pageId: string,
+  updates: {
+    name?: string;
+    index?: number;
+    updated_at?: Date;
+    updated_user_id?: string;
+  },
+) => {
+  try {
+    // 페이지 정보 업데이트
+    const updatedPage = await mongo.page.update({
+      where: { id: pageId },
+      data: {
+        // 제공된 업데이트 필드만 적용
+        ...(updates.name && { name: updates.name }),
+        ...(updates.index !== undefined && { index: updates.index }),
+        // 항상 서버 측에서 새 Date 객체 생성하여 사용
+        updated_at: new Date(),
+        ...(updates.updated_user_id && {
+          updated_user_id: updates.updated_user_id,
+        }),
+      },
+      include: {
+        page_canvases: {
+          orderBy: {
+            index: "asc",
+          },
+          include: {
+            canvas_layers: {
+              orderBy: {
+                index: "asc",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      page: updatedPage,
+    };
+  } catch (error) {
+    console.error("페이지 업데이트 실패:", error);
+    return {
+      success: false,
+      error: "페이지 업데이트에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 특정 페이지와 관련된 모든 리소스를 삭제하는 함수
+ *
+ * @param {string} pageId - 삭제할 페이지의 ID
+ * @returns {Promise<Object>} - 삭제 작업 결과와 성공 여부
+ */
+export const deletePage = async (pageId: string) => {
+  try {
+    // 삭제 전에 페이지 정보를 먼저 조회 (관련 캔버스, 레이어 ID를 얻기 위함)
+    const pageToDelete = await mongo.page.findUnique({
+      where: { id: pageId },
+      include: {
+        page_canvases: {
+          include: {
+            canvas_layers: true,
+          },
+        },
+      },
+    });
+
+    if (!pageToDelete) {
+      return {
+        success: false,
+        error: "삭제할 페이지를 찾을 수 없습니다.",
+      };
+    }
+
+    // 트랜잭션으로 모든 관련 리소스를 원자적으로 삭제
+    await mongo.$transaction(async (tx) => {
+      // 1. 각 캔버스에 속한 레이어 삭제
+      for (const canvas of pageToDelete.page_canvases) {
+        await tx.layer.deleteMany({
+          where: { canvas_id: canvas.id },
+        });
+      }
+
+      // 2. 페이지에 속한 모든 캔버스 삭제
+      await tx.canvas.deleteMany({
+        where: { page_id: pageId },
+      });
+
+      // 3. 페이지 삭제
+      await tx.page.delete({
+        where: { id: pageId },
+      });
+
+      // 4. 동일 프로젝트 내 다른 페이지들의 인덱스 조정
+      // 삭제된 페이지보다 인덱스가 큰 페이지들의 인덱스를 1씩 감소
+      if (pageToDelete.index !== undefined) {
+        await tx.page.updateMany({
+          where: {
+            project_id: pageToDelete.project_id,
+            index: { gt: pageToDelete.index },
+          },
+          data: {
+            index: { decrement: 1 },
+            updated_at: new Date(),
+          },
+        });
+      }
+    });
+
+    // 삭제 후 페이지의 프로젝트에 속한 모든 페이지 조회
+    const remainingPages = await mongo.page.findMany({
+      where: { project_id: pageToDelete.project_id },
+      orderBy: { index: "asc" },
+      include: {
+        page_canvases: {
+          orderBy: { index: "asc" },
+          include: {
+            canvas_layers: {
+              orderBy: { index: "asc" },
+            },
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      deletedPageId: pageId,
+      projectId: pageToDelete.project_id,
+      remainingPages: remainingPages,
+    };
+  } catch (error) {
+    console.error("페이지 삭제 실패:", error);
+    return {
+      success: false,
+      error: "페이지 삭제에 실패했습니다.",
+    };
+  }
+};

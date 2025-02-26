@@ -7,7 +7,9 @@ import {
 import { getPagesWithCanvases } from "../../app/actions/canvas";
 import {
   createNewPageWithDefaults,
+  deletePage,
   savePagesWithCanvasesAndLayers,
+  updatePage,
 } from "../service/canvas";
 
 // 소켓 이벤트 핸들러 함수 정의
@@ -75,6 +77,63 @@ export const projectSocketHandler = (io: Server) => {
         callback({
           success: false,
           error: "페이지 생성에 실패했습니다.",
+        });
+      }
+    });
+
+    socket.on("updatePage", async ({ pageId, project, updates }) => {
+      try {
+        // updatePage 함수 호출
+        const result = await updatePage(pageId, {
+          name: updates.name,
+          updated_user_id: updates.updated_user_id,
+          // updated_at은 함수 내부에서 새로 생성됨
+        });
+
+        // 성공적으로 업데이트되었음을 클라이언트에 알림
+        socket.emit("pageUpdated", {
+          success: result.success,
+          pageId,
+          page: result.page,
+          error: result.error,
+        });
+
+        // 동일 프로젝트 내 다른 클라이언트에게도 변경 사항 알림
+        if (result.success) {
+          socket.to(project).emit("pageUpdated", {
+            success: true,
+            pageId,
+            page: result.page,
+          });
+        }
+      } catch (error) {
+        console.error("페이지 업데이트 처리 실패:", error);
+        socket.emit("pageUpdated", {
+          success: false,
+          pageId,
+          error: "페이지 업데이트 처리에 실패했습니다.",
+        });
+      }
+    });
+
+    // 페이지 삭제 이벤트 핸들러 추가
+    socket.on("deletePage", async ({ pageId, project }, callback) => {
+      try {
+        // 페이지 삭제 작업 수행
+        const result = await deletePage(pageId);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 페이지 삭제 알림
+        if (result.success) {
+          socket.to(project).emit("pageDeleted", { pageId, success: true });
+        }
+      } catch (error) {
+        console.error("페이지 삭제 실패:", error);
+        callback({
+          success: false,
+          error: "페이지 삭제에 실패했습니다.",
         });
       }
     });

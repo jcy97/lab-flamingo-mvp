@@ -1,16 +1,16 @@
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import React, { useEffect, useState } from "react";
 import {
+  currentCanvasAtom,
   currentCanvasesAtom,
   currentPageAtom,
   pageCanvasInformationAtom,
+  pageSelectedCanvasMapAtom,
   pagesUpdatedAtom,
-  PageWithCanvases,
 } from "~/store/atoms";
 import {
   getYPagesMap,
   reorderPages,
-  addPage,
   deletePage,
   renamePage,
 } from "~/app/actions/pageYjs";
@@ -20,7 +20,11 @@ const PageList: React.FC = () => {
   const [pages, setPages] = useAtom(pageCanvasInformationAtom);
   const [selectedPage, setSelectedPage] = useAtom(currentPageAtom);
   const pagesUpdated = useAtomValue(pagesUpdatedAtom);
+  const [selectedCanvasMap, setSelectedCanvasMap] = useAtom(
+    pageSelectedCanvasMapAtom,
+  );
   const setCurrentCanvases = useSetAtom(currentCanvasesAtom);
+  const [currentCanvas, setCurrentCanvas] = useAtom(currentCanvasAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingPageId, setEditingPageId] = useState<string | null>(null);
@@ -30,9 +34,45 @@ const PageList: React.FC = () => {
   // 페이지 변경 시 캔버스 업데이트
   useEffect(() => {
     if (selectedPage) {
+      // 현재 페이지의 캔버스 목록 설정
       setCurrentCanvases(selectedPage.page_canvases);
+
+      // 이전에 이 페이지에서 선택한 캔버스가 있는지 확인
+      const previouslySelectedCanvasId = selectedCanvasMap[selectedPage.id];
+
+      if (previouslySelectedCanvasId) {
+        // 이전에 선택한 캔버스를 찾아 설정
+        const previousCanvas = selectedPage.page_canvases.find(
+          (canvas) => canvas.id === previouslySelectedCanvasId,
+        );
+
+        if (previousCanvas) {
+          setCurrentCanvas(previousCanvas);
+        } else {
+          // 이전 캔버스를 찾을 수 없는 경우 (삭제되었을 수 있음)
+          // 첫 번째 캔버스를 기본값으로 설정
+          if (selectedPage.page_canvases.length > 0) {
+            setCurrentCanvas(selectedPage.page_canvases[0]);
+          }
+        }
+      } else {
+        // 이전에 선택한 캔버스가 없는 경우 첫 번째 캔버스를 기본값으로 설정
+        if (selectedPage.page_canvases.length > 0) {
+          setCurrentCanvas(selectedPage.page_canvases[0]);
+        }
+      }
     }
-  }, [selectedPage, setCurrentCanvases]);
+  }, [selectedPage, setCurrentCanvases, selectedCanvasMap, setCurrentCanvas]);
+
+  // 캔버스 선택 상태가 변경될 때마다 맵 업데이트
+  useEffect(() => {
+    if (selectedPage && currentCanvas) {
+      setSelectedCanvasMap((prev) => ({
+        ...prev,
+        [selectedPage.id]: currentCanvas.id,
+      }));
+    }
+  }, [currentCanvas, selectedPage, setSelectedCanvasMap]);
 
   // YJS 변경사항에 대한 반응
   useEffect(() => {
@@ -85,29 +125,6 @@ const PageList: React.FC = () => {
     setDraggedItem(null);
     setDragOverItem(null);
   };
-  const handleAddPage = () => {
-    if (!session || !pages.length) return;
-
-    const newPageName = `페이지 ${pages.length + 1}`;
-    const projectId = pages[0]!.project_id;
-
-    const newPageId = addPage(newPageName, session, projectId);
-    if (newPageId) {
-      // 새 페이지는 YJS 관찰자를 통해 자동으로 pages 상태에 추가됨
-      // 필요하면 새 페이지로 직접 이동할 수 있음
-      setTimeout(() => {
-        const yPagesMap = getYPagesMap();
-        if (yPagesMap) {
-          // Y.Map에서 값만 추출하여 배열로 변환 (올바른 타입으로)
-          const newPages = Array.from(yPagesMap.values()) as PageWithCanvases[];
-          const newPage = newPages.find((p) => p.id === newPageId);
-          if (newPage) {
-            setSelectedPage(newPage);
-          }
-        }
-      }, 100); // 약간의 지연으로 YJS 동기화 시간을 고려
-    }
-  };
 
   const handleDeletePage = (pageId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // 페이지 선택 이벤트 방지
@@ -149,7 +166,7 @@ const PageList: React.FC = () => {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="h-[90%] overflow-y-auto">
+      <div className="h-full overflow-y-auto">
         <div className="flex w-full flex-col gap-2 overflow-y-auto">
           {pages
             .sort((a: any, b: any) => a.index - b.index)
@@ -209,13 +226,6 @@ const PageList: React.FC = () => {
             ))}
         </div>
       </div>
-
-      <button
-        onClick={handleAddPage}
-        className="hover:bg-primary-600 mt-2 rounded bg-primary-500 px-2 py-1 text-xs text-white transition-colors"
-      >
-        + 새 페이지 추가
-      </button>
     </div>
   );
 };

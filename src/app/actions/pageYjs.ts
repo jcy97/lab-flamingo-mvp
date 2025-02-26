@@ -125,18 +125,6 @@ export const initPageYjs = (
     setTimeout(() => {
       store.set(pagesUpdatedAtom, false);
     }, 2000);
-
-    // 5. 순서 변경 작업인 경우에만 savePages 호출
-    if (isOnlyIndexChange || hasAddOrDelete) {
-      // 서버에 변경사항 저장 요청
-      socket!.emit("savePages", {
-        project,
-        pages: pages.map((page) => ({
-          ...page,
-          // 인덱스는 이미 정렬로 설정되었으므로 그대로 사용
-        })),
-      });
-    }
   });
 };
 
@@ -280,54 +268,89 @@ export const deletePage = (pageId: string) => {
 
   if (pageIndex === -1) return;
 
-  doc.transact(() => {
-    // 페이지 삭제
-    yPagesMap.delete(pageId);
+  // 서버에 페이지 삭제 요청
+  const socket = store.get(projectSocketAtom);
+  const deletedPage = pages[pageIndex];
 
-    // 인덱스 재정렬
-    for (let i = 0; i < pages.length; i++) {
-      const page = pages[i];
-      if (page!.id !== pageId && page!.index > pageIndex) {
-        page!.index = page!.index - 1;
-        yPagesMap.set(page!.id, page!);
-      }
-    }
-  });
+  if (socket && deletedPage) {
+    socket.emit(
+      "deletePage",
+      {
+        pageId: pageId,
+        project: deletedPage.project_id,
+      },
+      (response: any) => {
+        if (response.success) {
+          // 서버에서 성공적으로 삭제됐을 때 로컬 Y.doc 업데이트
+          doc.transact(() => {
+            // 페이지 삭제
+            yPagesMap.delete(pageId);
 
-  // 활성 페이지가 삭제된 경우 다른 페이지로 전환
-  if (deletingCurrentPage) {
-    const updatedPages = Array.from(yPagesMap.values()).sort(
-      (a, b) => a.index - b.index,
-    );
-    if (updatedPages.length > 0) {
-      // 가능하면 이전 인덱스의 페이지로, 아니면 첫 페이지로
-      const newActiveIndex = Math.min(pageIndex, updatedPages.length - 1);
-      const newActivePage = updatedPages[newActiveIndex];
-      store.set(currentPageAtom, newActivePage);
+            // 인덱스 재정렬 (서버에서도 처리되지만, 로컬에서도 즉시 반영)
+            for (let i = 0; i < pages.length; i++) {
+              const page = pages[i];
+              if (page!.id !== pageId && page!.index > pageIndex) {
+                page!.index = page!.index - 1;
+                yPagesMap.set(page!.id, page!);
+              }
+            }
+          });
 
-      if (newActivePage!.page_canvases?.length > 0) {
-        store.set(currentCanvasesAtom, newActivePage!.page_canvases);
-        store.set(currentCanvasAtom, newActivePage!.page_canvases[0]);
+          // 활성 페이지가 삭제된 경우 다른 페이지로 전환
+          if (deletingCurrentPage) {
+            const updatedPages = Array.from(yPagesMap.values()).sort(
+              (a, b) => a.index - b.index,
+            );
+            if (updatedPages.length > 0) {
+              // 가능하면 이전 인덱스의 페이지로, 아니면 첫 페이지로
+              const newActiveIndex = Math.min(
+                pageIndex,
+                updatedPages.length - 1,
+              );
+              const newActivePage = updatedPages[newActiveIndex];
+              store.set(currentPageAtom, newActivePage);
 
-        if (newActivePage!.page_canvases[0]!.canvas_layers?.length > 0) {
-          store.set(
-            currentLayersAtom,
-            newActivePage!.page_canvases[0]!.canvas_layers,
-          );
-          store.set(
-            currentLayerAtom,
-            newActivePage!.page_canvases[0]!.canvas_layers[0],
-          );
+              if (newActivePage!.page_canvases?.length > 0) {
+                store.set(currentCanvasesAtom, newActivePage!.page_canvases);
+                store.set(currentCanvasAtom, newActivePage!.page_canvases[0]);
+
+                if (
+                  newActivePage!.page_canvases[0]!.canvas_layers?.length > 0
+                ) {
+                  store.set(
+                    currentLayersAtom,
+                    newActivePage!.page_canvases[0]!.canvas_layers,
+                  );
+                  store.set(
+                    currentLayerAtom,
+                    newActivePage!.page_canvases[0]!.canvas_layers[0],
+                  );
+                }
+              }
+            } else {
+              // 페이지가 없는 경우 관련 상태 초기화
+              const data = store.get(pageCanvasInformationAtom);
+              if (data && data.length > 0) {
+                store.set(currentPageAtom, data[0]);
+                store.set(currentCanvasesAtom, data[0]!.page_canvases!);
+                store.set(currentCanvasAtom, data[0]!.page_canvases[0]);
+                store.set(
+                  currentLayersAtom,
+                  data[0]!.page_canvases[0]!.canvas_layers!,
+                );
+                store.set(
+                  currentLayerAtom,
+                  data[0]!.page_canvases[0]!.canvas_layers[0],
+                );
+              }
+            }
+          }
+        } else {
+          console.error("페이지 삭제 실패:", response.error);
+          // 실패 시 사용자에게 알림 (선택사항)
         }
-      }
-    } else {
-      // // 페이지가 없는 경우 관련 상태 초기화
-      // store.set(currentPageAtom, null);
-      // store.set(currentCanvasesAtom, []);
-      // store.set(currentCanvasAtom, null);
-      // store.set(currentLayersAtom, []);
-      // store.set(currentLayerAtom, null);
-    }
+      },
+    );
   }
 };
 
@@ -343,14 +366,33 @@ export const renamePage = (
   const page = yPagesMap.get(pageId);
   if (!page) return;
 
-  doc.transact(() => {
-    // 기존 객체의 속성만 업데이트
-    page.name = newName;
-    page.updated_at = new Date();
-    page.updated_user_id = session.user.id;
+  // 서버로 이 페이지가 변경되었음을 알리고 저장 요청
+  const socket = store.get(projectSocketAtom);
+  if (socket) {
+    // 서버에 페이지 이름 변경 요청
+    socket.emit("updatePage", {
+      pageId: pageId,
+      project: page.project_id,
+      updates: {
+        name: newName,
+        updated_at: new Date(), // 서버에서 처리하도록 Date 객체 전달
+        updated_user_id: session.user.id,
+      },
+    });
+  }
 
-    // 변경된 객체를 다시 설정 (삭제하지 않음)
-    yPagesMap.set(pageId, page);
+  doc.transact(() => {
+    // YDoc에 변경사항 적용
+    const updatedPage = {
+      ...page,
+      name: newName,
+      // Date 객체를 그대로 유지
+      updated_at: new Date(),
+      updated_user_id: session.user.id,
+    };
+
+    // 변경된 객체를 YMap에 설정
+    yPagesMap.set(pageId, updatedPage);
   });
 
   // 현재 페이지를 업데이트하는 경우 UI 상태도 업데이트
@@ -359,6 +401,7 @@ export const renamePage = (
     store.set(currentPageAtom, {
       ...currentPage,
       name: newName,
+      updated_at: new Date(),
     });
   }
 };
