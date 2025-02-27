@@ -14,6 +14,7 @@ import {
   pageCanvasesAtom,
   pageCanvasInformationAtom,
 } from "~/store/atoms";
+import { layerSocketHandler, observeLayerChanges } from "./layerYjs";
 
 const store = getDefaultStore();
 
@@ -48,6 +49,7 @@ export const initCanvasYjs = (project: string, session: Session) => {
 
   // 캔버스 변경 감지 설정
   observeCanvasChanges();
+  layerSocketHandler();
 
   // 서버에서 재정렬된 캔버스 정보를 받아서 처리하는 이벤트 핸들러 추가
   socket?.on("canvasesReordered", ({ pageId, canvases, success }) => {
@@ -130,6 +132,18 @@ export const initCanvasesMap = (canvases: CanvasWithLayers[]) => {
   ydoc.transact(() => {
     canvases.forEach((canvas) => {
       canvasesMap.set(canvas.id, canvas);
+
+      // 각 캔버스별 레이어맵 초기화
+      if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+        const layersMap = ydoc.getMap<any>(`layers-${canvas.id}`);
+        layersMap.clear();
+
+        // 레이어 ID를 키로 사용하여 레이어 데이터 설정
+        canvas.canvas_layers.forEach((layer) => {
+          layersMap.set(layer.id, layer);
+        });
+        observeLayerChanges(canvas.id);
+      }
     });
   });
 };
@@ -162,7 +176,6 @@ export const observeCanvasChanges = () => {
       if (currentPageCanvases.length > 0) {
         // 현재 페이지의 캔버스 리스트 업데이트
         store.set(currentCanvasesAtom, currentPageCanvases);
-        console.log(59595);
 
         // pageCanvasesAtom 업데이트 (현재 페이지의 캔버스만 업데이트)
         const pageCanvases = store.get(pageCanvasesAtom);
@@ -186,21 +199,21 @@ export const observeCanvasChanges = () => {
       if (updatedCurrentCanvas) {
         store.set(currentCanvasAtom, updatedCurrentCanvas);
 
-        // 레이어도 업데이트
-        if (updatedCurrentCanvas.canvas_layers) {
-          store.set(currentLayersAtom, updatedCurrentCanvas.canvas_layers);
+        // // 레이어도 업데이트
+        // if (updatedCurrentCanvas.canvas_layers) {
+        //   store.set(currentLayersAtom, updatedCurrentCanvas.canvas_layers);
 
-          // 현재 선택된 레이어도 확인하여 업데이트
-          const currentLayer = store.get(currentLayerAtom);
-          if (currentLayer) {
-            const updatedLayer = updatedCurrentCanvas.canvas_layers.find(
-              (layer) => layer.id === currentLayer.id,
-            );
-            if (updatedLayer) {
-              store.set(currentLayerAtom, updatedLayer);
-            }
-          }
-        }
+        //   // 현재 선택된 레이어도 확인하여 업데이트
+        //   const currentLayer = store.get(currentLayerAtom);
+        //   if (currentLayer) {
+        //     const updatedLayer = updatedCurrentCanvas.canvas_layers.find(
+        //       (layer) => layer.id === currentLayer.id,
+        //     );
+        //     if (updatedLayer) {
+        //       store.set(currentLayerAtom, updatedLayer);
+        //     }
+        //   }
+        // }
       }
     } else {
       // 선택된 캔버스가 없는 경우 (최초 로드 또는 새 캔버스 추가 시)

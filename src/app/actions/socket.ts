@@ -4,9 +4,9 @@ import { Session } from "next-auth";
 import { io, Socket } from "socket.io-client";
 import { SOCKET_URL } from "~/constants/socket";
 import { currentConnectedUserAtom } from "~/store/atoms";
-import { initPageYjs } from "./pageYjs";
+import { initPageYjs } from "./yjs/pageYjs";
 import { projectSocketAtom } from "~/store/yjsAtoms";
-import { initCanvasYjs } from "./canvasYjs";
+import { initCanvasYjs } from "./yjs/canvasYjs";
 import { SocketIOProvider } from "y-socket.io";
 
 const store = getDefaultStore();

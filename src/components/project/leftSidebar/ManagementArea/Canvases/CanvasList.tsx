@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from "react";
-import { useAtom, useSetAtom } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
 import { BiRename, BiTrash } from "react-icons/bi";
 import {
+  canvasLayersAtom,
   currentCanvasAtom,
   currentCanvasesAtom,
   currentLayersAtom,
@@ -13,14 +14,15 @@ import {
   deleteCanvas,
   renameCanvas,
   reorderCanvases,
-} from "~/app/actions/canvasYjs";
+} from "~/app/actions/yjs/canvasYjs";
 
 const CanvasList: React.FC = () => {
   const { data: session } = useSession();
   const [canvases, setCanvases] = useAtom(currentCanvasesAtom);
-  const [selectedCanvas, setSelectedCanvas] = useAtom(currentCanvasAtom);
+  const [currentCanvas, setCurrentCanvas] = useAtom(currentCanvasAtom);
   const [currentPage] = useAtom(currentPageAtom);
   const setCurrentLayers = useSetAtom(currentLayersAtom);
+  const canvasLayers = useAtomValue(canvasLayersAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
@@ -30,10 +32,10 @@ const CanvasList: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (selectedCanvas) {
-      setCurrentLayers(selectedCanvas.canvas_layers);
+    if (currentCanvas) {
+      setCurrentLayers(canvasLayers[currentCanvas.id]!);
     }
-  }, [selectedCanvas, setCurrentLayers]);
+  }, [currentCanvas, setCurrentLayers]);
 
   useEffect(() => {
     if (editingCanvasId && inputRef.current) {
@@ -173,7 +175,7 @@ const CanvasList: React.FC = () => {
               onDragStart={(e) => handleDragStart(e, index)}
               onDragOver={(e) => handleDragOver(e, index)}
               onDragEnd={handleDragEnd}
-              onClick={() => setSelectedCanvas(canvas)}
+              onClick={() => setCurrentCanvas(canvas)}
               className={`flex w-[210px] flex-col duration-150 hover:cursor-pointer ${
                 draggedItem === index
                   ? "opacity-50"
@@ -185,7 +187,7 @@ const CanvasList: React.FC = () => {
               {/* 썸네일 컨테이너 */}
               <div
                 className={`overflow-hidden rounded-lg ${
-                  selectedCanvas && selectedCanvas.id === canvas.id
+                  currentCanvas && currentCanvas.id === canvas.id
                     ? "bg-primary-300"
                     : "bg-neutral-800 hover:bg-neutral-700"
                 }`}

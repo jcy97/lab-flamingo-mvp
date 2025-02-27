@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useAtom } from "jotai";
-import { addCanvas } from "~/app/actions/canvasYjs";
+import { addCanvas } from "~/app/actions/yjs/canvasYjs";
 import AddButton from "~/components/common/button/AddButton";
 import { currentPageAtom } from "~/store/atoms";
 

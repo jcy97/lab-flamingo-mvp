@@ -1,7 +1,7 @@
 import AddButton from "~/components/common/button/AddButton";
 import { useSetAtom, useAtomValue } from "jotai";
 import { pageCanvasInformationAtom, currentPageAtom } from "~/store/atoms";
-import { addPage, getYPagesMap } from "~/app/actions/pageYjs";
+import { addPage, getYPagesMap } from "~/app/actions/yjs/pageYjs";
 import { useSession } from "next-auth/react";
 import { PageWithCanvases } from "~/store/atoms";
 

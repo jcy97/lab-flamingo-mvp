@@ -38,6 +38,9 @@ export const currentPageAtom = atom<Page>();
 //현재 사용자가 선택한 페이지의 캔버스 리스트
 export const currentCanvasesAtom = atom<CanvasWithLayers[]>([]);
 
+//캔버스별 레이어 리스트
+export const canvasLayersAtom = atom<Record<string, Layer[]>>({});
+
 //현재 사용자가 선택한 캔버스
 export const currentCanvasAtom = atom<CanvasWithLayers>();
 

@@ -7,16 +7,7 @@ import { disconnectSocket, initProjectSocket } from "~/app/actions/socket";
 import LeftSidebar from "~/components/project/leftSidebar/LeftSidebar";
 import RightSidebar from "~/components/project/rightSidebar/RightSidebar";
 import Toolbar from "~/components/project/toolbar/Toolbar";
-import {
-  currentCanvasAtom,
-  currentCanvasesAtom,
-  currentLayerAtom,
-  currentLayersAtom,
-  currentPageAtom,
-  currentProjectAtom,
-  pageCanvasInformationAtom,
-  projectLoadingAtom,
-} from "~/store/atoms";
+import { currentProjectAtom, projectLoadingAtom } from "~/store/atoms";
 import { useSession } from "next-auth/react";
 import LoadingSpinner from "~/components/common/LoadingSpinner";
 

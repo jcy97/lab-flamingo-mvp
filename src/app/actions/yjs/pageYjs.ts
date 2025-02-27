@@ -6,6 +6,7 @@ import { getDefaultStore } from "jotai";
 import { pageYdocAtom, projectSocketAtom } from "~/store/yjsAtoms";
 import { Page } from "@prisma/mongodb-client";
 import {
+  canvasLayersAtom,
   currentCanvasAtom,
   currentCanvasesAtom,
   currentLayerAtom,
@@ -60,6 +61,17 @@ export const initPageYjs = (project: string, session: Session) => {
               ...prev,
               [rest.id]: page_canvases,
             }));
+            // 캔버스별 레이어 데이터 저장
+            if (page_canvases && page_canvases.length > 0) {
+              page_canvases.forEach((canvas) => {
+                if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+                  store.set(canvasLayersAtom, (prev) => ({
+                    ...prev,
+                    [canvas.id]: canvas.canvas_layers,
+                  }));
+                }
+              });
+            }
             return rest;
           });
 

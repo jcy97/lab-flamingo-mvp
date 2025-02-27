@@ -9,20 +9,24 @@ import {
   pageSelectedCanvasMapAtom,
   pagesUpdatedAtom,
 } from "~/store/atoms";
-import { reorderPages, deletePage, renamePage } from "~/app/actions/pageYjs";
+import {
+  reorderPages,
+  deletePage,
+  renamePage,
+} from "~/app/actions/yjs/pageYjs";
 import { useSession } from "next-auth/react";
-import { initCanvasesMap } from "~/app/actions/canvasYjs";
+import { initCanvasesMap } from "~/app/actions/yjs/canvasYjs";
 
 const PageList: React.FC = () => {
   const [pages, setPages] = useAtom(pagesAtom);
-  const [selectedPage, setSelectedPage] = useAtom(currentPageAtom);
+  const [currentPage, setCurrentPage] = useAtom(currentPageAtom);
   const pagesUpdated = useAtomValue(pagesUpdatedAtom);
-  const [selectedCanvasMap, setSelectedCanvasMap] = useAtom(
+  const [currentCanvasMap, setCurrentCanvasMap] = useAtom(
     pageSelectedCanvasMapAtom,
   );
   const setCurrentCanvases = useSetAtom(currentCanvasesAtom);
   const [currentCanvas, setCurrentCanvas] = useAtom(currentCanvasAtom);
-  const currentPageCanvases = useAtomValue(pageCanvasesAtom);
+  const pageCanvases = useAtomValue(pageCanvasesAtom);
 
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
@@ -32,17 +36,17 @@ const PageList: React.FC = () => {
 
   // 페이지 변경 시 캔버스 업데이트
   useEffect(() => {
-    if (selectedPage) {
+    if (currentPage) {
       // 현재 페이지의 캔버스 목록 설정
-      setCurrentCanvases(currentPageCanvases[selectedPage.id]!);
-      initCanvasesMap(currentPageCanvases[selectedPage.id]!);
+      setCurrentCanvases(pageCanvases[currentPage.id]!);
+      initCanvasesMap(pageCanvases[currentPage.id]!);
 
       // 이전에 이 페이지에서 선택한 캔버스가 있는지 확인
-      const previouslySelectedCanvasId = selectedCanvasMap[selectedPage.id];
+      const previouslySelectedCanvasId = currentCanvasMap[currentPage.id];
 
       if (previouslySelectedCanvasId) {
         // 이전에 선택한 캔버스를 찾아 설정
-        const previousCanvas = currentPageCanvases[selectedPage.id]!.find(
+        const previousCanvas = pageCanvases[currentPage.id]!.find(
           (canvas) => canvas.id === previouslySelectedCanvasId,
         );
 
@@ -51,42 +55,42 @@ const PageList: React.FC = () => {
         } else {
           // 이전 캔버스를 찾을 수 없는 경우 (삭제되었을 수 있음)
           // 첫 번째 캔버스를 기본값으로 설정
-          if (currentPageCanvases[selectedPage.id]!.length > 0) {
-            setCurrentCanvas(currentPageCanvases[selectedPage.id]![0]);
+          if (pageCanvases[currentPage.id]!.length > 0) {
+            setCurrentCanvas(pageCanvases[currentPage.id]![0]);
           }
         }
       } else {
         // 이전에 선택한 캔버스가 없는 경우 첫 번째 캔버스를 기본값으로 설정
-        if (currentPageCanvases[selectedPage.id]!.length > 0) {
-          setCurrentCanvas(currentPageCanvases[selectedPage.id]![0]);
+        if (pageCanvases[currentPage.id]!.length > 0) {
+          setCurrentCanvas(pageCanvases[currentPage.id]![0]);
         }
       }
     }
-  }, [selectedPage]);
+  }, [currentPage]);
 
   // 캔버스 선택 상태가 변경될 때마다 맵 업데이트
   useEffect(() => {
-    if (selectedPage && currentCanvas) {
-      setSelectedCanvasMap((prev) => ({
+    if (currentPage && currentCanvas) {
+      setCurrentCanvasMap((prev) => ({
         ...prev,
-        [selectedPage.id]: currentCanvas.id,
+        [currentPage.id]: currentCanvas.id,
       }));
     }
-  }, [currentCanvas, selectedPage, setSelectedCanvasMap]);
+  }, [currentCanvas, currentPage, setCurrentCanvasMap]);
 
   // YJS 변경사항에 대한 반응
   useEffect(() => {
     if (pagesUpdated) {
       // YJS에서 업데이트된 페이지가 있으면, 현재 선택된 페이지를
       // 업데이트된 데이터로 갱신
-      if (selectedPage) {
-        const updatedPage = pages.find((p) => p.id === selectedPage.id);
-        if (updatedPage && updatedPage !== selectedPage) {
-          setSelectedPage(updatedPage);
+      if (currentPage) {
+        const updatedPage = pages.find((p) => p.id === currentPage.id);
+        if (updatedPage && updatedPage !== currentPage) {
+          setCurrentPage(updatedPage);
         }
       }
     }
-  }, [pagesUpdated, pages, selectedPage, setSelectedPage]);
+  }, [pagesUpdated, pages, currentPage, setCurrentPage]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
@@ -177,9 +181,9 @@ const PageList: React.FC = () => {
                 onDragStart={(e) => handleDragStart(e, index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                onClick={() => setSelectedPage(page)}
+                onClick={() => setCurrentPage(page)}
                 className={`flex h-[25px] min-w-[210px] cursor-pointer items-center rounded px-2 text-xs text-neutral-100 ${
-                  selectedPage?.id === page.id
+                  currentPage?.id === page.id
                     ? "bg-primary-500 hover:bg-primary-500"
                     : "bg-neutral-900"
                 } ${
