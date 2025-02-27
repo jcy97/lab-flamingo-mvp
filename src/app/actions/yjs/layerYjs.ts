@@ -227,3 +227,80 @@ export const addLayer = (
     );
   });
 };
+
+// 레이어 순서 변경 함수
+export const reorderLayer = (
+  canvasId: string,
+  sourceIndex: number,
+  destinationIndex: number,
+) => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return;
+
+  const doc = getCanvasYdoc();
+  if (!doc) return;
+
+  // 현재 레이어 상태 가져오기
+  const layers = getLayers(canvasId);
+  if (!layers || layers.length === 0) return;
+
+  // 정렬된 레이어 배열
+  const sortedLayers = [...layers].sort((a, b) => a.index - b.index);
+
+  // 이동할 레이어
+  const movingLayer = sortedLayers[sourceIndex];
+  if (!movingLayer) return;
+
+  // 드래그 후 새 순서로 정렬된 레이어 ID 배열 생성
+  const layerIds = sortedLayers.map((layer) => layer.id);
+  const reorderedLayerIds = [...layerIds];
+  const movedId = reorderedLayerIds.splice(sourceIndex, 1)[0];
+  reorderedLayerIds.splice(destinationIndex, 0, movedId!);
+
+  // 새로운 순서대로 정렬된 레이어 배열 생성
+  const newOrderedLayers = reorderedLayerIds
+    .map((id, index) => {
+      const layer = sortedLayers.find((l) => l.id === id);
+      if (layer) {
+        return {
+          ...layer,
+          index,
+        };
+      }
+      return null;
+    })
+    .filter(Boolean) as Layer[];
+
+  // 트랜잭션으로 일괄 처리
+  doc.transact(() => {
+    // 각 레이어의 인덱스를 새 순서에 맞게 업데이트
+    newOrderedLayers.forEach((layer) => {
+      layersMap.set(layer.id, layer);
+    });
+  });
+
+  // 서버에 레이어 재정렬 요청
+  const socket = store.get(projectSocketAtom);
+  if (socket) {
+    socket.emit(
+      "reorderLayers",
+      {
+        canvasId: canvasId,
+        layerIds: reorderedLayerIds,
+        project: socket.id,
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("레이어 순서 변경 실패:", response.error);
+
+          // 실패 시 원래 순서로 되돌리기
+          doc.transact(() => {
+            sortedLayers.forEach((layer) => {
+              layersMap.set(layer.id, layer);
+            });
+          });
+        }
+      },
+    );
+  }
+};

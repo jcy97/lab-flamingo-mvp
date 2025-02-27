@@ -105,3 +105,52 @@ export const updateLayer = async (
     };
   }
 };
+
+/**
+ * 레이어 순서를 변경하는 함수
+ *
+ * @param {string} canvasId - 레이어가 속한 캔버스 ID
+ * @param {string[]} layerIds - 새로운 순서로 정렬된 레이어 ID 배열
+ * @returns {Promise<Object>} - 업데이트된 레이어 목록과 성공 여부
+ */
+export const reorderLayers = async (canvasId: string, layerIds: string[]) => {
+  try {
+    // 트랜잭션으로 모든 레이어 업데이트 작업을 일괄 처리
+    const updatePromises = layerIds.map((layerId, index) => {
+      return mongo.layer.update({
+        where: {
+          id: layerId,
+          canvas_id: canvasId, // 추가 보안을 위해 캔버스 ID도 확인
+        },
+        data: {
+          index: index,
+          updated_at: new Date(),
+        },
+      });
+    });
+
+    // 모든 업데이트 프로미스 실행
+    await Promise.all(updatePromises);
+
+    // 업데이트된 레이어 목록 조회 (순서대로 정렬)
+    const updatedLayers = await mongo.layer.findMany({
+      where: {
+        canvas_id: canvasId,
+      },
+      orderBy: {
+        index: "asc",
+      },
+    });
+
+    return {
+      success: true,
+      layers: updatedLayers,
+    };
+  } catch (error) {
+    console.error("레이어 순서 변경 실패:", error);
+    return {
+      success: false,
+      error: "레이어 순서 변경에 실패했습니다.",
+    };
+  }
+};

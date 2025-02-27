@@ -15,7 +15,7 @@ import {
   updatePage,
   updatePagesOrder,
 } from "../service/canvas";
-import { createLayer, updateLayer } from "../service/layer";
+import { createLayer, reorderLayers, updateLayer } from "../service/layer";
 
 // 소켓 이벤트 핸들러 함수 정의
 export const projectSocketHandler = (io: Server) => {
@@ -325,6 +325,35 @@ export const projectSocketHandler = (io: Server) => {
             layerId,
             canvasId,
             error: "레이어 업데이트 처리에 실패했습니다.",
+          });
+        }
+      },
+    );
+
+    // 레이어 재정렬
+    socket.on(
+      "reorderLayers",
+      async ({ canvasId, layerIds, project }, callback) => {
+        try {
+          // Call function to update layers' order in database
+          const result = await reorderLayers(canvasId, layerIds);
+
+          // Return results via callback
+          callback(result);
+
+          // If successful, notify other users in the project
+          if (result.success) {
+            socket.to(project).emit("layersReordered", {
+              canvasId,
+              layers: result.layers,
+              success: true,
+            });
+          }
+        } catch (error) {
+          console.error("레이어 순서 변경 실패:", error);
+          callback({
+            success: false,
+            error: "레이어 순서 변경에 실패했습니다.",
           });
         }
       },

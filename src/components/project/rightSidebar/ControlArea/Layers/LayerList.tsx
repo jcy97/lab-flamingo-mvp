@@ -9,7 +9,7 @@ import {
   currentLayerAtom,
   currentLayersAtom,
 } from "~/store/atoms";
-import { renameLayer } from "~/app/actions/yjs/layerYjs";
+import { renameLayer, reorderLayer } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 
 const LayerList: React.FC = () => {
@@ -42,23 +42,15 @@ const LayerList: React.FC = () => {
   };
 
   const handleDragEnd = () => {
-    if (draggedItem === null || dragOverItem === null) {
+    if (draggedItem === null || dragOverItem === null || !currentCanvas) {
       setDraggedItem(null);
       setDragOverItem(null);
       return;
     }
+    // 레이어 순서 변경 함수 호출
+    reorderLayer(currentCanvas.id, draggedItem, dragOverItem);
 
-    const newLayers = [...layers];
-    const draggedLayers = newLayers[draggedItem];
-
-    const tempIndex = draggedLayers!.index;
-    draggedLayers!.index = newLayers[dragOverItem]!.index;
-    newLayers[dragOverItem]!.index = tempIndex;
-
-    newLayers.splice(draggedItem, 1);
-    newLayers.splice(dragOverItem, 0, draggedLayers!);
-
-    setLayers(newLayers);
+    // 드래그 상태 초기화
     setDraggedItem(null);
     setDragOverItem(null);
   };
@@ -69,8 +61,8 @@ const LayerList: React.FC = () => {
   };
 
   const handleNameEditComplete = () => {
-    if (editingLayerId) {
-      renameLayer(currentCanvas!.id, currentLayer!.id, editingName, session!);
+    if (editingLayerId && currentCanvas && session) {
+      renameLayer(currentCanvas.id, editingLayerId, editingName, session);
     }
     setEditingLayerId(null);
   };
@@ -82,6 +74,14 @@ const LayerList: React.FC = () => {
       setEditingLayerId(null);
     }
   };
+
+  if (!layers || layers.length === 0 || !currentCanvas || !currentLayer) {
+    return (
+      <div className="flex h-full w-full items-center justify-center text-neutral-400">
+        레이어가 없습니다
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full flex-col gap-1 overflow-y-auto">
@@ -102,7 +102,7 @@ const LayerList: React.FC = () => {
                   ? "border-2 border-primary-500"
                   : ""
             } ${
-              currentLayer!.id === layer.id
+              currentLayer.id === layer.id
                 ? "bg-neutral-500"
                 : "bg-neutral-800 hover:bg-neutral-700"
             }`}
