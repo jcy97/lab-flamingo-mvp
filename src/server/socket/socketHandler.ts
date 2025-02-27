@@ -15,7 +15,7 @@ import {
   updatePage,
   updatePagesOrder,
 } from "../service/canvas";
-import { updateLayer } from "../service/layer";
+import { createLayer, updateLayer } from "../service/layer";
 
 // 소켓 이벤트 핸들러 함수 정의
 export const projectSocketHandler = (io: Server) => {
@@ -265,6 +265,39 @@ export const projectSocketHandler = (io: Server) => {
         }
       },
     );
+    // 레이어 생성 이벤트 핸들러 추가
+    socket.on("createLayer", async (data, callback) => {
+      try {
+        const { canvasId, project, layerData } = data;
+
+        // 새 레이어 생성 작업을 수행
+        const result = await createLayer(canvasId, layerData);
+        console.log("신규 레이어 생성:");
+        console.log(result);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 레이어 추가 알림
+        // Y.js가 동기화를 처리하므로 추가 알림은 필요 없을 수 있으나,
+        // 필요시 다음 코드 활성화
+        /*
+        if (result.success) {
+          socket.to(project).emit("layerAdded", {
+            canvasId,
+            layer: result.layer,
+          });
+        }
+        */
+      } catch (error) {
+        console.error("레이어 생성 실패:", error);
+        callback({
+          success: false,
+          error: "레이어 생성에 실패했습니다.",
+        });
+      }
+    });
+
     socket.on(
       "renameLayer",
       async ({ canvasId, layerId, newName, updatedBy }) => {

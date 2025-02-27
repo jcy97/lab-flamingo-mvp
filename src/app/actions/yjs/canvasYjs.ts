@@ -198,22 +198,6 @@ export const observeCanvasChanges = () => {
       // 선택된 캔버스가 업데이트된 경우만 업데이트
       if (updatedCurrentCanvas) {
         store.set(currentCanvasAtom, updatedCurrentCanvas);
-
-        // // 레이어도 업데이트
-        // if (updatedCurrentCanvas.canvas_layers) {
-        //   store.set(currentLayersAtom, updatedCurrentCanvas.canvas_layers);
-
-        //   // 현재 선택된 레이어도 확인하여 업데이트
-        //   const currentLayer = store.get(currentLayerAtom);
-        //   if (currentLayer) {
-        //     const updatedLayer = updatedCurrentCanvas.canvas_layers.find(
-        //       (layer) => layer.id === currentLayer.id,
-        //     );
-        //     if (updatedLayer) {
-        //       store.set(currentLayerAtom, updatedLayer);
-        //     }
-        //   }
-        // }
       }
     } else {
       // 선택된 캔버스가 없는 경우 (최초 로드 또는 새 캔버스 추가 시)
@@ -465,7 +449,7 @@ export const deleteCanvas = (pageId: string, canvasId: string) => {
   }
 };
 
-// 캔버스 추가 함수
+// 캔버스 추가
 export const addCanvas = (
   pageId: string,
   session: Session,
@@ -504,8 +488,6 @@ export const addCanvas = (
         }
 
         const newCanvas = response.canvas;
-        console.log("캔버스 아이디");
-        console.log(newCanvas.id);
 
         doc.transact(() => {
           // 캔버스 맵에 새 캔버스 추가

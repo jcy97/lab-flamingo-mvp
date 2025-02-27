@@ -6,8 +6,10 @@ import {
   canvasLayersAtom,
   currentCanvasAtom,
   currentCanvasesAtom,
+  currentLayerAtom,
   currentLayersAtom,
   currentPageAtom,
+  canvasSelectedLayerMapAtom,
 } from "~/store/atoms";
 import { useSession } from "next-auth/react";
 import {
@@ -22,7 +24,11 @@ const CanvasList: React.FC = () => {
   const [currentCanvas, setCurrentCanvas] = useAtom(currentCanvasAtom);
   const [currentPage] = useAtom(currentPageAtom);
   const setCurrentLayers = useSetAtom(currentLayersAtom);
+  const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
   const canvasLayers = useAtomValue(canvasLayersAtom);
+  const [canvasSelectedLayerMap, setCanvasSelectedLayerMap] = useAtom(
+    canvasSelectedLayerMapAtom,
+  );
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
@@ -31,11 +37,63 @@ const CanvasList: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
+  // 캔버스가 변경될 때 레이어 관련 처리
   useEffect(() => {
-    if (currentCanvas) {
-      setCurrentLayers(canvasLayers[currentCanvas.id]!);
+    if (currentCanvas && canvasLayers[currentCanvas.id]) {
+      // 현재 캔버스의 레이어 목록 설정
+      const layers = canvasLayers[currentCanvas.id] || [];
+      setCurrentLayers(layers);
+
+      // 이미 선택된 레이어가 있고 해당 레이어가 현재 캔버스의 레이어 중 하나인지 확인
+      if (
+        currentLayer &&
+        currentLayer.canvas_id === currentCanvas.id &&
+        layers.some((layer) => layer.id === currentLayer.id)
+      ) {
+        // 이미 적절한 레이어가 선택되어 있으므로 아무것도 하지 않음
+        return;
+      }
+
+      // 이전에 이 캔버스에서 선택한 레이어가 있는지 확인
+      const previouslySelectedLayerId =
+        canvasSelectedLayerMap[currentCanvas.id];
+
+      if (previouslySelectedLayerId) {
+        // 이전에 선택한 레이어를 찾아 설정
+        const previousLayer = layers.find(
+          (layer) => layer.id === previouslySelectedLayerId,
+        );
+
+        if (previousLayer) {
+          // 이전에 선택한 레이어가 존재하면 현재 레이어로 설정
+          setCurrentLayer(previousLayer);
+        } else if (layers.length > 0) {
+          // 이전 레이어를 찾을 수 없는 경우 첫 번째 레이어를 기본값으로 설정
+          setCurrentLayer(layers[0]);
+        }
+      } else if (layers.length > 0) {
+        // 이전에 선택한 레이어가 없는 경우 첫 번째 레이어를 기본값으로 설정
+        setCurrentLayer(layers[0]);
+      }
     }
-  }, [currentCanvas, setCurrentLayers]);
+  }, [currentCanvas, canvasLayers]);
+
+  // 레이어 선택 상태가 변경될 때 맵 업데이트
+  useEffect(() => {
+    if (
+      currentCanvas &&
+      currentLayer &&
+      currentLayer.canvas_id === currentCanvas.id
+    ) {
+      // 맵 업데이트 전에 현재 값과 비교
+      if (canvasSelectedLayerMap[currentCanvas.id] !== currentLayer.id) {
+        setCanvasSelectedLayerMap((prev) => ({
+          ...prev,
+          [currentCanvas.id]: currentLayer.id,
+        }));
+      }
+    }
+  }, [currentLayer, currentCanvas]);
 
   useEffect(() => {
     if (editingCanvasId && inputRef.current) {
@@ -44,7 +102,7 @@ const CanvasList: React.FC = () => {
     }
   }, [editingCanvasId]);
 
-  // Close menu when clicking outside
+  // 외부 클릭 시 메뉴 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -84,12 +142,12 @@ const CanvasList: React.FC = () => {
 
     const pageId = currentPage.id;
 
-    // Call reorderCanvases to persist the change through YJS and server
+    // YJS를 통해 캔버스 재정렬
     reorderCanvases(pageId, draggedItem, dragOverItem);
 
-    // Note: We no longer need to manually update the UI state here as the YJS observation will handle it
+    // 참고: YJS 관찰을 통해 UI 상태가 처리되므로 수동으로 업데이트할 필요가 없음
 
-    // Reset drag state
+    // 드래그 상태 초기화
     setDraggedItem(null);
     setDragOverItem(null);
   };
@@ -118,13 +176,13 @@ const CanvasList: React.FC = () => {
     }
   };
 
-  // Toggle settings menu
+  // 설정 메뉴 토글
   const toggleMenu = (e: React.MouseEvent, canvasId: string) => {
-    e.stopPropagation(); // Prevent canvas selection
+    e.stopPropagation(); // 캔버스 선택 이벤트 방지
     setMenuOpen(menuOpen === canvasId ? null : canvasId);
   };
 
-  // Start rename from menu
+  // 메뉴에서 이름 변경 시작
   const handleRenameClick = (
     e: React.MouseEvent,
     canvasId: string,
@@ -136,7 +194,7 @@ const CanvasList: React.FC = () => {
     setEditingName(name);
   };
 
-  // Handle canvas deletion
+  // 캔버스 삭제 처리
   const handleDeleteClick = (
     e: React.MouseEvent,
     canvasId: string,
@@ -146,7 +204,7 @@ const CanvasList: React.FC = () => {
 
     if (!session) return;
 
-    // Confirm before deletion
+    // 삭제 전 확인
     if (
       window.confirm("캔버스를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.")
     ) {
@@ -217,7 +275,7 @@ const CanvasList: React.FC = () => {
                     </span>
                   )}
 
-                  {/* Settings Icon with Menu */}
+                  {/* 설정 아이콘과 메뉴 */}
                   <div className="relative">
                     <IoMdSettings
                       className="text-neutral-100 duration-150 hover:scale-105 hover:cursor-pointer"
@@ -225,12 +283,12 @@ const CanvasList: React.FC = () => {
                       onClick={(e) => toggleMenu(e, canvas.id)}
                     />
 
-                    {/* Settings Popup Menu */}
+                    {/* 설정 팝업 메뉴 */}
                     {menuOpen === canvas.id && (
                       <div
                         ref={menuRef}
                         className="absolute right-0 top-6 z-50 w-36 rounded bg-neutral-800 shadow-lg"
-                        onClick={(e) => e.stopPropagation()} // Prevent canvas selection
+                        onClick={(e) => e.stopPropagation()} // 캔버스 선택 방지
                       >
                         <div className="flex flex-col py-1">
                           <button
