@@ -1,15 +1,19 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { IoMdEye } from "react-icons/io";
-import { IoMdEyeOff } from "react-icons/io";
+import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 import { HiOutlineAdjustments } from "react-icons/hi";
+import { BiRename, BiTrash } from "react-icons/bi";
 import { useAtom, useAtomValue } from "jotai";
 import {
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
 } from "~/store/atoms";
-import { renameLayer, reorderLayer } from "~/app/actions/yjs/layerYjs";
+import {
+  deleteLayer,
+  renameLayer,
+  reorderLayer,
+} from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 
 const LayerList: React.FC = () => {
@@ -21,7 +25,9 @@ const LayerList: React.FC = () => {
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [editingLayerId, setEditingLayerId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>("");
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editingLayerId && inputRef.current) {
@@ -29,6 +35,20 @@ const LayerList: React.FC = () => {
       inputRef.current.select();
     }
   }, [editingLayerId]);
+
+  // Outside click handler to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
@@ -72,6 +92,39 @@ const LayerList: React.FC = () => {
       handleNameEditComplete();
     } else if (e.key === "Escape") {
       setEditingLayerId(null);
+    }
+  };
+
+  // 설정 메뉴 토글
+  const toggleMenu = (e: React.MouseEvent, layerId: string) => {
+    e.stopPropagation(); // 레이어 선택 이벤트 방지
+    setMenuOpen(menuOpen === layerId ? null : layerId);
+  };
+
+  // 메뉴에서 이름 변경 시작
+  const handleRenameClick = (
+    e: React.MouseEvent,
+    layerId: string,
+    name: string,
+  ) => {
+    e.stopPropagation();
+    setMenuOpen(null);
+    setEditingLayerId(layerId);
+    setEditingName(name);
+  };
+
+  // 레이어 삭제 처리
+  const handleDeleteClick = (e: React.MouseEvent, layerId: string) => {
+    e.stopPropagation();
+
+    if (!currentCanvas) return;
+
+    // 삭제 전 확인
+    if (
+      window.confirm("레이어를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.")
+    ) {
+      deleteLayer(currentCanvas.id, layerId);
+      setMenuOpen(null);
     }
   };
 
@@ -144,8 +197,40 @@ const LayerList: React.FC = () => {
                 </span>
               )}
             </div>
-            <div className="flex h-full w-[40px] items-center justify-center pr-4">
-              <HiOutlineAdjustments className="text-neutral-100" size={22} />
+            <div className="relative flex h-full w-[40px] items-center justify-center pr-4">
+              <HiOutlineAdjustments
+                className="text-neutral-100 hover:cursor-pointer"
+                size={22}
+                onClick={(e) => toggleMenu(e, layer.id)}
+              />
+
+              {/* 설정 팝업 메뉴 */}
+              {menuOpen === layer.id && (
+                <div
+                  ref={menuRef}
+                  className="absolute right-0 top-10 z-50 w-36 rounded bg-neutral-800 shadow-lg"
+                  onClick={(e) => e.stopPropagation()} // 레이어 선택 방지
+                >
+                  <div className="flex flex-col py-1">
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) =>
+                        handleRenameClick(e, layer.id, layer.name)
+                      }
+                    >
+                      <BiRename size={16} />
+                      <span>이름 변경</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"
+                      onClick={(e) => handleDeleteClick(e, layer.id)}
+                    >
+                      <BiTrash size={16} />
+                      <span>삭제</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         ))}

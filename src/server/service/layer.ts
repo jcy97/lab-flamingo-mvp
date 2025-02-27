@@ -154,3 +154,98 @@ export const reorderLayers = async (canvasId: string, layerIds: string[]) => {
     };
   }
 };
+
+/**
+ * 레이어를 삭제하는 함수
+ *
+ * @param {string} layerId - 삭제할 레이어의 ID
+ * @param {string} canvasId - 레이어가 속한 캔버스 ID (추가 보안 확인용)
+ * @returns {Promise<Object>} - 삭제 결과와 성공 여부, 캔버스에 남아있는 레이어 목록
+ */
+export const deleteLayer = async (layerId: string, canvasId: string) => {
+  try {
+    // 해당 레이어가 존재하는지, 그리고 지정된 캔버스에 속하는지 확인
+    const layer = await mongo.layer.findFirst({
+      where: {
+        id: layerId,
+        canvas_id: canvasId,
+      },
+    });
+
+    if (!layer) {
+      return {
+        success: false,
+        error: "레이어를 찾을 수 없습니다.",
+      };
+    }
+
+    // 해당 캔버스의 모든 레이어 개수 확인
+    const layersCount = await mongo.layer.count({
+      where: {
+        canvas_id: canvasId,
+      },
+    });
+
+    // 최소 한 개의 레이어는 유지되어야 함
+    if (layersCount <= 1) {
+      return {
+        success: false,
+        error: "최소한 하나의 레이어는 유지되어야 합니다.",
+      };
+    }
+
+    // 레이어 삭제
+    await mongo.layer.delete({
+      where: {
+        id: layerId,
+      },
+    });
+
+    // 남은 레이어들의 인덱스 재정렬
+    const remainingLayers = await mongo.layer.findMany({
+      where: {
+        canvas_id: canvasId,
+      },
+      orderBy: {
+        index: "asc",
+      },
+    });
+
+    // 인덱스 재정렬 작업
+    const updatePromises = remainingLayers.map((layer, index) => {
+      return mongo.layer.update({
+        where: {
+          id: layer.id,
+        },
+        data: {
+          index: index,
+          updated_at: new Date(),
+        },
+      });
+    });
+
+    // 모든 업데이트 프로미스 실행
+    await Promise.all(updatePromises);
+
+    // 업데이트된 최종 레이어 목록 조회
+    const updatedLayers = await mongo.layer.findMany({
+      where: {
+        canvas_id: canvasId,
+      },
+      orderBy: {
+        index: "asc",
+      },
+    });
+
+    return {
+      success: true,
+      remainingLayers: updatedLayers,
+    };
+  } catch (error) {
+    console.error("레이어 삭제 실패:", error);
+    return {
+      success: false,
+      error: "레이어 삭제에 실패했습니다.",
+    };
+  }
+};

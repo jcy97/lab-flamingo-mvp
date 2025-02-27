@@ -57,5 +57,5 @@ export const currentConnectedUserAtom = atom<CurrentConnectedUser[]>([]);
 // 페이지 ID를 키로, 캔버스 ID를 값으로 사용
 export const pageSelectedCanvasMapAtom = atom<Record<string, string>>({});
 
-// 캔버스별 선택된 레이어 ID를 저장하는 atom (필요한 경우)
+// 캔버스별 선택된 레이어 ID를 저장하는 atom
 export const canvasSelectedLayerMapAtom = atom<Record<string, string>>({});

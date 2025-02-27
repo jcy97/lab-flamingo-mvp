@@ -5,6 +5,7 @@ import { projectSocketAtom } from "~/store/yjsAtoms";
 import { Layer } from "@prisma/mongodb-client";
 import {
   canvasLayersAtom,
+  canvasSelectedLayerMapAtom,
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
@@ -299,6 +300,86 @@ export const reorderLayer = (
               layersMap.set(layer.id, layer);
             });
           });
+        }
+      },
+    );
+  }
+};
+
+// 레이어 삭제
+export const deleteLayer = (canvasId: string, layerId: string) => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return;
+
+  const doc = getCanvasYdoc();
+  if (!doc) return;
+
+  // 현재 레이어 상태 가져오기
+  const layers = getLayers(canvasId);
+  if (!layers || layers.length <= 1) {
+    // 최소 한 개의 레이어는 유지해야 함
+    alert("마지막 레이어는 삭제할 수 없습니다.");
+    return;
+  }
+
+  // 삭제할 레이어 찾기
+  const layerToDelete = layersMap.get(layerId);
+  if (!layerToDelete) return;
+
+  // 현재 선택된 레이어와 삭제할 레이어가 같은지 확인하기 위한 저장소 접근
+  const store = getDefaultStore();
+  const currentLayer = store.get(currentLayerAtom);
+  const currentCanvas = store.get(currentCanvasAtom);
+
+  doc.transact(() => {
+    // 레이어 맵에서 레이어 삭제
+    layersMap.delete(layerId);
+  });
+
+  // 서버에 레이어 삭제 요청
+  const socket = store.get(projectSocketAtom);
+  if (socket) {
+    socket.emit(
+      "deleteLayer",
+      {
+        canvasId: canvasId,
+        layerId: layerId,
+        project: socket.id,
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("레이어 삭제 실패:", response.error);
+
+          // 실패 시 삭제한 레이어 복구
+          if (layerToDelete) {
+            doc.transact(() => {
+              layersMap.set(layerId, layerToDelete);
+            });
+          }
+        } else {
+          // 삭제 후 남은 레이어 가져오기
+          const remainingLayers = getLayers(canvasId);
+
+          // 만약 삭제한 레이어가 현재 선택된 레이어였다면 다른 레이어 선택
+          if (
+            currentLayer &&
+            currentCanvas &&
+            currentCanvas.id === canvasId &&
+            currentLayer.id === layerId &&
+            remainingLayers.length > 0
+          ) {
+            // 첫 번째 레이어를 새로 선택
+            store.set(currentLayerAtom, remainingLayers[0]);
+
+            // 캔버스 선택 레이어 맵 업데이트
+            const canvasSelectedLayerMap = store.get(
+              canvasSelectedLayerMapAtom,
+            );
+            store.set(canvasSelectedLayerMapAtom, {
+              ...canvasSelectedLayerMap,
+              [canvasId]: remainingLayers[0]!.id,
+            });
+          }
         }
       },
     );
