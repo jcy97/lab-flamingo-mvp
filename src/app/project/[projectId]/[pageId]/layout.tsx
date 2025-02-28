@@ -48,11 +48,17 @@ export default function PageLayout({
 
   return (
     <>
-      <main>
-        <LeftSidebar />
-        <RightSidebar />
-        <Toolbar />
-        <div className="w-full">{children}</div>
+      <main className="relative">
+        <div className="relative z-20">
+          <LeftSidebar />
+        </div>
+        <div className="relative z-20">
+          <RightSidebar />
+        </div>
+        <div className="relative z-10">
+          <Toolbar />
+        </div>
+        <div className="relative z-0">{children}</div>
       </main>
     </>
   );
