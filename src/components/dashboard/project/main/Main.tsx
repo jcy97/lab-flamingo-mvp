@@ -6,6 +6,7 @@ import {
   getInitialProjectUrl,
   getUserProjects,
   editProjectName,
+  deleteProjectWithAllData,
 } from "~/app/actions/project";
 import { Project } from "~/schemas";
 import { currentProjectAtom, isLoadingAtom, projectsAtom } from "~/store/atoms";
@@ -90,13 +91,20 @@ const Main: React.FC = () => {
     }
   };
 
-  const handleDeleteProject = (e: React.MouseEvent, project: Project) => {
+  const handleDeleteProject = async (e: React.MouseEvent, project: Project) => {
     e.stopPropagation();
     setActiveMenu(null);
 
     if (confirm(`'${project.name}' 프로젝트를 삭제하시겠습니까?`)) {
-      const updatedProjects = projects.filter((p) => p.uuid !== project.uuid);
-      setProjects(updatedProjects);
+      const result = await deleteProjectWithAllData(project.uuid);
+
+      if (!result?.success) {
+        console.error("프로젝트 삭제 실패:", result?.message);
+        alert(`프로젝트 삭제 실패: ${result?.message}`);
+      } else {
+        const updatedProjects = projects.filter((p) => p.uuid !== project.uuid);
+        setProjects(updatedProjects);
+      }
     }
   };
 

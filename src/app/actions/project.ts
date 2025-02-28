@@ -7,6 +7,7 @@ import { ZodError } from "zod";
 import {
   createProjectTransaction,
   createProjectWithDefaults,
+  deleteProject,
   selectInitialProjectUrl,
   selectUserProjects,
   updateProjectName,
@@ -125,6 +126,25 @@ export const editProjectName = async (uuid: string, newName: string) => {
   }
 };
 
+/**
+ * 프로젝트를 삭제하는 서버 액션
+ * 해당 프로젝트와 관련된 모든 요소를 삭제합니다.
+ *
+ * @param {string} uuid - 프로젝트 UUID
+ * @returns {Promise<{ success: boolean; message?: string; }>}  결과
+ */
+export const deleteProjectWithAllData = async (projectUuid: string) => {
+  try {
+    const result = await deleteProject(projectUuid);
+    return result;
+  } catch (error) {
+    console.error("프로젝트 삭제 처리 중 오류:", error);
+    return {
+      success: false,
+      message: "프로젝트 삭제 중 오류가 발생했습니다.",
+    };
+  }
+};
 /**
  * 사용자의 프로젝트 목록을 조회하는 함수
  *

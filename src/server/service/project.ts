@@ -234,3 +234,150 @@ export const selectInitialProjectUrl = async (projectId: string) => {
     console.error(error);
   }
 };
+
+/**
+ * 프로젝트 및 관련 데이터를 완전히 삭제하는 함수
+ * @param projectUuid 삭제할 프로젝트의 UUID
+ * @returns 삭제 결과 객체
+ */
+export const deleteProject = async (projectUuid: string) => {
+  try {
+    // 트랜잭션 시작
+    // MongoDB 데이터부터 삭제
+    const mongoResult = await deleteMongoDbData(projectUuid);
+
+    // MongoDB 삭제가 성공하면 PostgreSQL 데이터 삭제
+    if (mongoResult.success) {
+      const postgresResult = await deletePostgresData(projectUuid);
+
+      return {
+        success: postgresResult.success,
+        message: postgresResult.success
+          ? "프로젝트가 성공적으로 삭제되었습니다."
+          : `MongoDB 데이터는 삭제되었으나, PostgreSQL 데이터 삭제 중 오류가 발생했습니다: ${postgresResult.error}`,
+      };
+    } else {
+      // MongoDB 삭제 실패 시
+      return {
+        success: false,
+        message: `프로젝트 삭제 중 오류가 발생했습니다: ${mongoResult.error}`,
+      };
+    }
+  } catch (error) {
+    console.error("프로젝트 삭제 중 예기치 않은 오류:", error);
+    return {
+      success: false,
+      message: "프로젝트 삭제 중 예기치 않은 오류가 발생했습니다.",
+      error,
+    };
+  }
+};
+
+/**
+ * MongoDB에서 프로젝트 및 관련 데이터 삭제
+ */
+const deleteMongoDbData = async (projectUuid: string) => {
+  try {
+    // MongoDB에서 해당 프로젝트 찾기
+    const project = await mongo.project.findUnique({
+      where: { id: projectUuid },
+      include: {
+        project_pages: {
+          include: {
+            page_canvases: {
+              include: {
+                canvas_layers: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!project) {
+      return {
+        success: false,
+        error: "해당 UUID의 프로젝트를 MongoDB에서 찾을 수 없습니다.",
+      };
+    }
+
+    // MongoDB 트랜잭션 시작
+    await mongo.$transaction(async (tx) => {
+      // 1. 각 레이어 삭제
+      for (const page of project.project_pages) {
+        for (const canvas of page.page_canvases) {
+          // 모든 레이어 삭제
+          await tx.layer.deleteMany({
+            where: { canvas_id: canvas.id },
+          });
+
+          // 캔버스 삭제
+          await tx.canvas.delete({
+            where: { id: canvas.id },
+          });
+        }
+
+        // 페이지 삭제
+        await tx.page.delete({
+          where: { id: page.id },
+        });
+      }
+
+      // 프로젝트 삭제
+      await tx.project.delete({
+        where: { id: projectUuid },
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("MongoDB 데이터 삭제 중 오류:", error);
+    return {
+      success: false,
+      error: `MongoDB 데이터 삭제 중 오류: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
+/**
+ * PostgreSQL에서 프로젝트 및 관련 데이터 삭제
+ */
+const deletePostgresData = async (projectUuid: string) => {
+  try {
+    // PostgreSQL에서 해당 프로젝트 찾기
+    const project = await db.project.findUnique({
+      where: { uuid: projectUuid },
+      include: {
+        project_users: true,
+      },
+    });
+
+    if (!project) {
+      return {
+        success: false,
+        error: "해당 UUID의 프로젝트를 PostgreSQL에서 찾을 수 없습니다.",
+      };
+    }
+
+    // PostgreSQL 트랜잭션 시작
+    await db.$transaction(async (tx) => {
+      // 1. 프로젝트 사용자 연결 정보 삭제
+      await tx.projectUser.deleteMany({
+        where: { project_id: project.id },
+      });
+
+      // 2. 프로젝트 자체 삭제
+      await tx.project.delete({
+        where: { id: project.id },
+      });
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("프로젝트 데이터 삭제 중 오류:", error);
+    return {
+      success: false,
+      error: `프로젝트 데이터 삭제 중 오류: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
