@@ -55,6 +55,52 @@ export const createProjectTransaction = async (
 };
 
 /**
+ * 프로젝트 이름을 수정하는 함수
+ * @param projectId 수정할 프로젝트의 ID
+ * @param newName 변경할 새 프로젝트 이름
+ * @param userId 업데이트를 수행하는 사용자 ID
+ * @returns 업데이트된 프로젝트 객체
+ */
+export const updateProjectName = async (
+  projectUuid: string,
+  newName: string,
+  userId: string,
+) => {
+  try {
+    // 프로젝트가 존재하는지 먼저 확인
+    const existingProject = await db.project.findUnique({
+      where: {
+        uuid: projectUuid,
+      },
+    });
+
+    if (!existingProject) {
+      throw new Error(`ID가 ${projectUuid}인 프로젝트를 찾을 수 없습니다.`);
+    }
+
+    // 프로젝트 이름 업데이트
+    const updatedProject = await db.project.update({
+      where: {
+        uuid: projectUuid,
+      },
+      data: {
+        name: newName,
+        updated_at: new Date(),
+        updated_user_id: userId,
+      },
+    });
+
+    return updatedProject;
+  } catch (error) {
+    console.error("프로젝트 이름 업데이트 중 오류 발생:", error);
+    throw error;
+  } finally {
+    // 필요하다면 Prisma 연결 해제
+    // await prisma.$disconnect();
+  }
+};
+
+/**
  * 기본 페이지와 캔버스를 포함하여 프로젝트를 생성하는 함수
  *
  * @param userId - 프로젝트를 생성하는 사용자 ID
@@ -124,6 +170,7 @@ export const createProjectWithDefaults = async (
     throw error;
   }
 };
+
 /**
  * 주어진 사용자 ID에 해당하는 프로젝트 목록을 데이터베이스에서 조회합니다.
  *

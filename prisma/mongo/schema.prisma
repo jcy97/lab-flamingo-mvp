@@ -34,6 +34,8 @@ model Canvas {
   id              String   @id @default(uuid()) @map("_id")
   name            String
   index           Int
+  width           Float
+  hieght          Float
   created_at      DateTime @default(now())
   created_user_id String
   updated_at      DateTime @updatedAt

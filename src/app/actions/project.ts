@@ -9,6 +9,7 @@ import {
   createProjectWithDefaults,
   selectInitialProjectUrl,
   selectUserProjects,
+  updateProjectName,
 } from "~/server/service/project";
 
 /**
@@ -70,6 +71,57 @@ export const createProject = async (name: string) => {
       }
     }
     throw error; // 다른 에러는 상위로 전파
+  }
+};
+
+/**
+ * 프로젝트 이름을 업데이트하는 서버 액션
+ * 유효성 검사 및 데이터베이스 업데이트를 모두 수행
+ *
+ * @param {string} uuid - 프로젝트 UUID
+ * @param {string} newName - 변경할 새 프로젝트 이름
+ * @returns {Promise<{ success: boolean; message?: string; }>} 업데이트 결과
+ */
+export const editProjectName = async (uuid: string, newName: string) => {
+  const session = await auth();
+
+  try {
+    if (!session?.user.id) {
+      return { success: false, message: "사용자가 존재하지 않습니다." };
+    }
+
+    // 이름 유효성 검사
+    try {
+      // 전체 스키마가 아닌 name 필드만 검증
+      await projectSchema.pick({ name: true }).parseAsync({ name: newName });
+    } catch (validationError) {
+      if (validationError instanceof ZodError) {
+        return {
+          success: false,
+          message:
+            validationError.errors[0]?.message ||
+            "유효하지 않은 프로젝트 이름입니다.",
+        };
+      }
+      throw validationError; // 다른 유형의 에러는 다시 던짐
+    }
+
+    // 데이터베이스 업데이트
+    await updateProjectName(uuid, newName, session?.user.id);
+
+    // 성공 시 반환값 추가
+    return {
+      success: true,
+      message: "프로젝트 이름이 성공적으로 변경되었습니다.",
+    };
+  } catch (error) {
+    console.error("프로젝트 이름 업데이트 중 오류 발생:", error);
+
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : "알 수 없는 오류가 발생했습니다.";
+    return { success: false, message: errorMessage };
   }
 };
 
