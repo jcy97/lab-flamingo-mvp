@@ -2,6 +2,7 @@ import { atom } from "jotai";
 import { Project } from "~/schemas";
 import { Canvas, Page, Layer } from "@prisma/mongodb-client";
 import { CurrentConnectedUser } from "~/types/types";
+import { ToolbarItemIDs } from "~/constants/toolbarItems";
 
 export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
@@ -12,10 +13,16 @@ export type CanvasWithLayers = Canvas & {
 // 전역 로딩 상태 관리
 export const isLoadingAtom = atom<Boolean>(false);
 
+// 스케일 팩터
+export const scaleFactorAtom = atom(1);
+
 // 프로젝트 로딩 상태 관리
 export const projectLoadingAtom = atom<Boolean>(true);
 // 프로젝트 전체 리스트
 export const projectsAtom = atom<Project[]>([]);
+
+//선택한 툴바 아이템
+export const currentToolbarItemAtom = atom(ToolbarItemIDs.SELECT);
 
 // 현재 접속 프로젝트
 export const currentProjectAtom = atom<Project>();

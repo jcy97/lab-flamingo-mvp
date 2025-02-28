@@ -1,18 +1,44 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ToolbarItem from "./ToolbarItem";
 import { toolbarItems } from "~/constants/toolbarItems";
+import { useAtom } from "jotai";
+import { currentToolbarItemAtom } from "~/store/atoms";
 
 const Toolbar: React.FC = () => {
-  const [selectedTool, setSelectedTool] = useState<string>("select");
-  const [selectedSubItemId, setSelectedSubItemId] = useState<
-    string | undefined
-  >();
+  const [currentToolId, setCurrentToolId] = useAtom(currentToolbarItemAtom);
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
 
-  const handleSubItemSelect = (parentId: string, subItemId: string) => {
-    setSelectedTool(parentId);
-    setSelectedSubItemId(subItemId);
+  // UI 표시용 로컬 상태
+  const [activeToolId, setActiveToolId] = useState<string>("select");
+
+  // 현재 선택된 툴이 어떤 부모 툴에 속하는지 찾는 함수
+  const findParentTool = (toolId: string) => {
+    // 직접 툴바 아이템인지 확인
+    const directTool = toolbarItems.find((item) => item.id === toolId);
+    if (directTool) return toolId;
+
+    // 서브아이템인 경우 부모 찾기
+    for (const item of toolbarItems) {
+      if (
+        item.subItems &&
+        item.subItems.some((subItem) => subItem.id === toolId)
+      ) {
+        return item.id;
+      }
+    }
+
+    return "select"; // 기본값
+  };
+
+  // 전역 상태가 변경되면 UI 상태도 업데이트
+  useEffect(() => {
+    setActiveToolId(findParentTool(currentToolId));
+  }, [currentToolId]);
+
+  const handleToolSelect = (toolId: string) => {
+    // 전역 상태 업데이트
+    setCurrentToolId(toolId);
   };
 
   return (
@@ -21,12 +47,9 @@ const Toolbar: React.FC = () => {
         <ToolbarItem
           key={item.id}
           item={item}
-          isSelected={selectedTool === item.id}
-          onSelect={setSelectedTool}
-          selectedSubItemId={
-            selectedTool === item.id ? selectedSubItemId : undefined
-          }
-          onSubItemSelect={handleSubItemSelect}
+          isSelected={activeToolId === item.id}
+          selectedToolId={currentToolId}
+          onSelect={handleToolSelect}
           openDropdownId={openDropdownId}
           setOpenDropdownId={setOpenDropdownId}
         />
@@ -34,5 +57,4 @@ const Toolbar: React.FC = () => {
     </div>
   );
 };
-
 export default Toolbar;

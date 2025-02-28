@@ -7,9 +7,8 @@ import { IconType } from "react-icons";
 interface ToolbarItemProps {
   item: ToolbarItemType;
   isSelected: boolean;
+  selectedToolId: string;
   onSelect: (id: string) => void;
-  selectedSubItemId?: string;
-  onSubItemSelect: (parentId: string, subItemId: string) => void;
   openDropdownId: string | null;
   setOpenDropdownId: (id: string | null) => void;
 }
@@ -17,9 +16,8 @@ interface ToolbarItemProps {
 const ToolbarItem: React.FC<ToolbarItemProps> = ({
   item,
   isSelected,
+  selectedToolId,
   onSelect,
-  selectedSubItemId,
-  onSubItemSelect,
   openDropdownId,
   setOpenDropdownId,
 }) => {
@@ -29,22 +27,40 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({
     }
   });
 
-  const handleDropdownToggle = () => {
-    if (openDropdownId === item.id) {
-      setOpenDropdownId(null);
+  const handleMainItemClick = () => {
+    if (item.hasSubItems) {
+      // 드롭다운 표시
+      setOpenDropdownId(item.id === openDropdownId ? null : item.id);
+
+      // 서브아이템이 있는 경우 첫 번째 서브아이템 선택
+      if (
+        item.subItems &&
+        item.subItems.length > 0 &&
+        item.id !== openDropdownId
+      ) {
+        onSelect(item.subItems[0]!.id);
+      }
     } else {
-      setOpenDropdownId(item.id);
+      // 서브아이템이 없는 경우, 아이템 자체를 선택
+      onSelect(item.id);
+      setOpenDropdownId(null);
     }
   };
+
+  // 현재 표시할 아이콘 결정
   const getCurrentIcon = (): IconType => {
-    if (item.subItems && selectedSubItemId) {
+    // 서브아이템이 있는 경우
+    if (item.subItems) {
+      // 현재 선택된 id가 이 아이템의 서브아이템인지 확인
       const selectedSubItem = item.subItems.find(
-        (subItem) => subItem.id === selectedSubItemId,
+        (subItem) => subItem.id === selectedToolId,
       );
       if (selectedSubItem) {
         return selectedSubItem.icon;
       }
     }
+
+    // 기본 아이콘
     return item.icon;
   };
 
@@ -59,12 +75,17 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({
             : "hover:bg-neutral-800"
         }`}
       >
-        <button onClick={() => onSelect(item.id)} className="flex items-center">
+        <button onClick={handleMainItemClick} className="flex items-center">
           <CurrentIcon className="h-5 w-5 text-neutral-100" />
         </button>
 
         {item.hasSubItems && (
-          <button onClick={handleDropdownToggle}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpenDropdownId(item.id === openDropdownId ? null : item.id);
+            }}
+          >
             <BiChevronDown
               className={`h-3 w-3 text-neutral-100 transition-transform ${
                 openDropdownId === item.id ? "rotate-180" : ""
@@ -83,11 +104,11 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({
               <button
                 key={subItem.id}
                 onClick={() => {
-                  onSubItemSelect(item.id, subItem.id);
+                  onSelect(subItem.id);
                   setOpenDropdownId(null);
                 }}
                 className={`flex w-full items-center gap-2 rounded-lg px-1 py-2 ${
-                  selectedSubItemId === subItem.id
+                  selectedToolId === subItem.id
                     ? "bg-primary-500 hover:bg-primary-500"
                     : "hover:bg-neutral-800"
                 }`}
