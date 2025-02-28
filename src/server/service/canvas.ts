@@ -367,6 +367,8 @@ export const createCanvas = async (
   pageId: string,
   canvasData: {
     name: string | number;
+    width?: number;
+    height?: number;
     created_user_id: string;
     updated_user_id: string;
   },
@@ -378,11 +380,13 @@ export const createCanvas = async (
         where: { page_id: pageId },
       });
 
-      // 1. 새 캔버스 생성
+      // 1. 새 캔버스 생성 (width와 height에 기본값 적용)
       const newCanvas = await tx.canvas.create({
         data: {
           name: `캔버스 ${canvasData.name || existingCanvasCount + 1}`,
           index: existingCanvasCount, // 기존 캔버스 개수를 인덱스로 사용 (맨 뒤에 추가)
+          width: canvasData.width || 1920, // 기본값: 1920 (FHD 가로)
+          height: canvasData.height || 1080, // 기본값: 1080 (FHD 세로)
           page_id: pageId,
           created_user_id: canvasData.created_user_id,
           updated_user_id: canvasData.updated_user_id,
@@ -423,7 +427,6 @@ export const createCanvas = async (
     };
   }
 };
-
 /**
  * 특정 페이지 내의 캔버스 순서를 재정렬하는 함수
  * @param {string} pageId - 페이지 ID

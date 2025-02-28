@@ -34,8 +34,8 @@ model Canvas {
   id              String   @id @default(uuid()) @map("_id")
   name            String
   index           Int
-  width           Float
-  hieght          Float
+  width           Float    @default(1920)
+  height          Float    @default(1080)
   created_at      DateTime @default(now())
   created_user_id String
   updated_at      DateTime @updatedAt
@@ -43,7 +43,6 @@ model Canvas {
   page            Page     @relation(fields: [page_id], references: [id])
   page_id         String
   canvas_layers   Layer[] 
-
 }
 
 model Layer {

@@ -449,10 +449,12 @@ export const deleteCanvas = (pageId: string, canvasId: string) => {
   }
 };
 
-// 캔버스 추가
+// addCanvas 함수를 수정하여 width와 height 매개변수 추가
 export const addCanvas = (
   pageId: string,
   session: Session,
+  width: number = 1920,
+  height: number = 1080,
 ): Promise<string | null> => {
   const canvasesMap = getCanvasesMap();
   if (!canvasesMap) return Promise.resolve(null);
@@ -476,6 +478,8 @@ export const addCanvas = (
         project: socket.id,
         canvasData: {
           name: canvases.length + 1,
+          width: width,
+          height: height,
           created_user_id: session.user.id,
           updated_user_id: session.user.id,
         },
