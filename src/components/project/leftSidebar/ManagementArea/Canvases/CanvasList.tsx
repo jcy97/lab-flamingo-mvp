@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
-import { BiRename, BiTrash } from "react-icons/bi";
+import { BiRename, BiTrash, BiEdit } from "react-icons/bi";
 import {
   canvasLayersAtom,
   currentCanvasAtom,
@@ -16,7 +16,10 @@ import {
   deleteCanvas,
   renameCanvas,
   reorderCanvases,
+  updateCanvas,
 } from "~/app/actions/yjs/canvasYjs";
+import CanvasEditPopup from "./CanvasEditPopup";
+import PopupPortal from "~/components/common/PopupPotal";
 
 const CanvasList: React.FC = () => {
   const { data: session } = useSession();
@@ -36,6 +39,10 @@ const CanvasList: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // 캔버스 편집 팝업 상태
+  const [isEditPopupOpen, setIsEditPopupOpen] = useState<boolean>(false);
+  const [editingCanvas, setEditingCanvas] = useState<any>(null);
 
   // 캔버스가 변경될 때 레이어 관련 처리
   useEffect(() => {
@@ -145,8 +152,6 @@ const CanvasList: React.FC = () => {
     // YJS를 통해 캔버스 재정렬
     reorderCanvases(pageId, draggedItem, dragOverItem);
 
-    // 참고: YJS 관찰을 통해 UI 상태가 처리되므로 수동으로 업데이트할 필요가 없음
-
     // 드래그 상태 초기화
     setDraggedItem(null);
     setDragOverItem(null);
@@ -192,6 +197,38 @@ const CanvasList: React.FC = () => {
     setMenuOpen(null);
     setEditingCanvasId(canvasId);
     setEditingName(name);
+  };
+
+  // 캔버스 수정 버튼 클릭 시
+  const handleEditClick = (e: React.MouseEvent, canvas: any) => {
+    e.stopPropagation();
+    setMenuOpen(null);
+    setEditingCanvas(canvas);
+    setIsEditPopupOpen(true);
+  };
+
+  // 캔버스 편집 팝업 확인 처리
+  const handleEditConfirm = (
+    width: number,
+    height: number,
+    background: string,
+  ) => {
+    // 편집 팝업은 자체적으로 updateCanvas를 호출하므로 여기서는 팝업을 닫기만 함
+    setIsEditPopupOpen(false);
+    setEditingCanvas(null);
+  };
+
+  // 캔버스 수정 처리 함수
+  const handleUpdateCanvas = (
+    pageId: string,
+    canvasId: string,
+    width: number,
+    height: number,
+    background: string,
+  ) => {
+    if (session) {
+      updateCanvas(pageId, canvasId, width, height, background, session);
+    }
   };
 
   // 캔버스 삭제 처리
@@ -293,6 +330,13 @@ const CanvasList: React.FC = () => {
                         <div className="flex flex-col py-1">
                           <button
                             className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                            onClick={(e) => handleEditClick(e, canvas)}
+                          >
+                            <BiEdit size={16} />
+                            <span>수정</span>
+                          </button>
+                          <button
+                            className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
                             onClick={(e) =>
                               handleRenameClick(e, canvas.id, canvas.name)
                             }
@@ -327,6 +371,30 @@ const CanvasList: React.FC = () => {
             </div>
           ))}
       </div>
+
+      {/* PopupPortal을 사용하여 캔버스 편집 팝업 렌더링 */}
+      <PopupPortal isOpen={isEditPopupOpen}>
+        {editingCanvas && (
+          <CanvasEditPopup
+            isOpen={isEditPopupOpen}
+            onClose={() => {
+              setIsEditPopupOpen(false);
+              setEditingCanvas(null);
+            }}
+            onConfirm={handleEditConfirm}
+            mode="edit"
+            canvasData={{
+              id: editingCanvas.id,
+              name: editingCanvas.name,
+              width: editingCanvas.width,
+              height: editingCanvas.height,
+              background: editingCanvas.background,
+              page_id: editingCanvas.page_id,
+            }}
+            updateCanvas={handleUpdateCanvas}
+          />
+        )}
+      </PopupPortal>
     </div>
   );
 };

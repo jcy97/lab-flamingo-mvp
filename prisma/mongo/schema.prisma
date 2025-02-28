@@ -36,6 +36,7 @@ model Canvas {
   index           Int
   width           Float    @default(1920)
   height          Float    @default(1080)
+  background      String   @default("#FFFFFF")
   created_at      DateTime @default(now())
   created_user_id String
   updated_at      DateTime @updatedAt

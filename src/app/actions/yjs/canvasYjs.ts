@@ -336,7 +336,7 @@ export const renameCanvas = (
     canvasesMap.set(canvasId, updatedCanvas);
   });
 
-  // 서버에 업데이트 전송
+  // 서버에 업데이트 전송 (이제 updateCanvas 이벤트 사용)
   if (socket) {
     socket.emit(
       "updateCanvas",
@@ -363,7 +363,6 @@ export const renameCanvas = (
     );
   }
 };
-
 // 캔버스 삭제 함수
 export const deleteCanvas = (pageId: string, canvasId: string) => {
   const canvasesMap = getCanvasesMap();
@@ -455,6 +454,7 @@ export const addCanvas = (
   session: Session,
   width: number = 1920,
   height: number = 1080,
+  color: string = "#FFFFFF",
 ): Promise<string | null> => {
   const canvasesMap = getCanvasesMap();
   if (!canvasesMap) return Promise.resolve(null);
@@ -480,6 +480,7 @@ export const addCanvas = (
           name: canvases.length + 1,
           width: width,
           height: height,
+          color: color,
           created_user_id: session.user.id,
           updated_user_id: session.user.id,
         },
@@ -519,4 +520,69 @@ export const addCanvas = (
       },
     );
   });
+};
+export const updateCanvas = (
+  pageId: string,
+  canvasId: string,
+  width: number,
+  height: number,
+  background: string,
+  session: Session,
+) => {
+  const canvasesMap = getCanvasesMap();
+  if (!canvasesMap) return;
+
+  const doc = getCanvasYdoc();
+  if (!doc) return;
+
+  // 현재 캔버스 객체 가져오기
+  const canvas = canvasesMap.get(canvasId);
+  if (!canvas) return;
+
+  // 트랜잭션 전에 소켓 저장
+  const socket = store.get(projectSocketAtom);
+
+  doc.transact(() => {
+    // 변경된 캔버스 객체 생성
+    const updatedCanvas = {
+      ...canvas,
+      width: width,
+      height: height,
+      background: background,
+      updated_user_id: session.user.id,
+      updated_at: new Date(),
+    };
+
+    // 캔버스 맵에 업데이트된 캔버스 저장
+    canvasesMap.set(canvasId, updatedCanvas);
+  });
+
+  // 서버에 업데이트 전송
+  if (socket) {
+    socket.emit(
+      "updateCanvas",
+      {
+        canvasId: canvasId,
+        pageId: pageId,
+        project: socket.id,
+        updates: {
+          width: width,
+          height: height,
+          background: background,
+          updated_user_id: session.user.id,
+        },
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("캔버스 속성 변경 실패:", response.error);
+          // 서버 업데이트가 실패하면 변경 사항 되돌리기
+          if (canvas) {
+            doc.transact(() => {
+              canvasesMap.set(canvasId, canvas);
+            });
+          }
+        }
+      },
+    );
+  }
 };

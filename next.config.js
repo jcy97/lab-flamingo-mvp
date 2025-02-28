@@ -7,7 +7,7 @@ import "./src/env.js";
 /** @type {import("next").NextConfig} */
 const config = {
   webpack: (config) => {
-    config.externals = [...config.externals, "bcrypt"];
+    config.externals = [...config.externals, "bcrypt", { canvas: "canvas" }];
     return config;
   },
 };

@@ -311,7 +311,7 @@ export const deletePage = async (pageId: string) => {
  * 캔버스 정보를 업데이트하는 함수
  *
  * @param {string} canvasId - 업데이트할 캔버스의 ID
- * @param {Object} updates - 업데이트할 데이터 (이름, 업데이트 시간, 업데이트한 사용자 ID 등)
+ * @param {Object} updates - 업데이트할 데이터 (이름, 크기, 배경색, 업데이트한 사용자 ID 등)
  * @returns {Promise<Object>} - 업데이트된 캔버스 정보와 성공 여부
  */
 export const updateCanvas = async (
@@ -319,6 +319,9 @@ export const updateCanvas = async (
   updates: {
     name?: string;
     index?: number;
+    width?: number;
+    height?: number;
+    background?: string;
     updated_user_id?: string;
   },
 ) => {
@@ -328,8 +331,13 @@ export const updateCanvas = async (
       where: { id: canvasId },
       data: {
         // 제공된 업데이트 필드만 적용
-        ...(updates.name && { name: updates.name }),
+        ...(updates.name !== undefined && { name: updates.name }),
         ...(updates.index !== undefined && { index: updates.index }),
+        ...(updates.width !== undefined && { width: updates.width }),
+        ...(updates.height !== undefined && { height: updates.height }),
+        ...(updates.background !== undefined && {
+          background: updates.background,
+        }),
         // 항상 서버 측에서 새 Date 객체 생성하여 사용
         updated_at: new Date(),
         ...(updates.updated_user_id && {
@@ -367,8 +375,9 @@ export const createCanvas = async (
   pageId: string,
   canvasData: {
     name: string | number;
-    width?: number;
-    height?: number;
+    width: number;
+    height: number;
+    color: string;
     created_user_id: string;
     updated_user_id: string;
   },
@@ -387,6 +396,7 @@ export const createCanvas = async (
           index: existingCanvasCount, // 기존 캔버스 개수를 인덱스로 사용 (맨 뒤에 추가)
           width: canvasData.width || 1920, // 기본값: 1920 (FHD 가로)
           height: canvasData.height || 1080, // 기본값: 1080 (FHD 세로)
+          background: canvasData.color || "#FFFFFF",
           page_id: pageId,
           created_user_id: canvasData.created_user_id,
           updated_user_id: canvasData.updated_user_id,

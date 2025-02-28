@@ -16,7 +16,7 @@ const Toolbar: React.FC = () => {
   };
 
   return (
-    <div className="fixed bottom-6 left-1/2 flex h-[40px] w-[500px] -translate-x-1/2 transform items-center gap-4 rounded-xl bg-neutral-900 px-4">
+    <div className="fixed bottom-6 left-1/2 z-[9999] flex h-[40px] w-[500px] -translate-x-1/2 transform items-center gap-4 rounded-xl bg-neutral-900 px-4">
       {toolbarItems.map((item) => (
         <ToolbarItem
           key={item.id}

@@ -1,5 +1,6 @@
 import { type Config } from "tailwindcss";
 import { fontFamily } from "tailwindcss/defaultTheme";
+import plugin from "tailwindcss/plugin";
 
 export default {
   content: ["./src/**/*.tsx"],
@@ -47,5 +48,21 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    plugin(function ({ addUtilities }) {
+      addUtilities({
+        ".bg-checkerboard": {
+          "background-image": `
+            linear-gradient(45deg, #ccc 25%, transparent 25%), 
+            linear-gradient(-45deg, #ccc 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #ccc 75%),
+            linear-gradient(-45deg, transparent 75%, #ccc 75%)
+          `,
+          "background-size": "20px 20px",
+          "background-position": "0 0, 0 10px, 10px -10px, -10px 0px",
+          "background-color": "white",
+        },
+      });
+    }),
+  ],
 } satisfies Config;

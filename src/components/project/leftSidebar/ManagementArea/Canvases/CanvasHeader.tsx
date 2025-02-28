@@ -1,10 +1,12 @@
+"use client";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useAtom } from "jotai";
 import { addCanvas } from "~/app/actions/yjs/canvasYjs";
 import AddButton from "~/components/common/button/AddButton";
 import { currentPageAtom } from "~/store/atoms";
-import CanvasSizePopup from "./CanvasSizePopup";
+import CanvasEditPopup from "./CanvasEditPopup";
+import PopupPortal from "~/components/common/PopupPotal";
 
 const CanvasHeader: React.FC = () => {
   const { data: session } = useSession();
@@ -21,7 +23,11 @@ const CanvasHeader: React.FC = () => {
     setIsPopupOpen(false);
   };
 
-  const handleCreateCanvas = async (width: number, height: number) => {
+  const handleCreateCanvas = async (
+    width: number,
+    height: number,
+    color: string,
+  ) => {
     if (!session || !currentPage) return;
 
     try {
@@ -31,6 +37,7 @@ const CanvasHeader: React.FC = () => {
         session,
         width,
         height,
+        color,
       );
       console.log("새 캔버스가 추가되었습니다:", newCanvasId);
     } catch (error) {
@@ -42,11 +49,16 @@ const CanvasHeader: React.FC = () => {
     <div className="flex w-full gap-2">
       <p className="text-xs font-bold text-neutral-100">캔버스</p>
       <AddButton size={18} onClick={handleAddButtonClick} />
-      <CanvasSizePopup
-        isOpen={isPopupOpen}
-        onClose={handlePopupClose}
-        onConfirm={handleCreateCanvas}
-      />
+
+      {/* Portal을 사용하여 팝업 렌더링 */}
+      <PopupPortal isOpen={isPopupOpen}>
+        <CanvasEditPopup
+          isOpen={isPopupOpen}
+          onClose={handlePopupClose}
+          onConfirm={handleCreateCanvas}
+          mode={"create"}
+        />
+      </PopupPortal>
     </div>
   );
 };

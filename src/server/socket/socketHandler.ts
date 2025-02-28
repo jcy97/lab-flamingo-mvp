@@ -154,7 +154,17 @@ export const projectSocketHandler = (io: Server) => {
         try {
           // updateCanvas 함수 호출
           const result = await updateCanvas(canvasId, {
-            name: updates.name,
+            // 이름 업데이트가 있는 경우
+            ...(updates.name !== undefined && { name: updates.name }),
+            // 너비 업데이트가 있는 경우
+            ...(updates.width !== undefined && { width: updates.width }),
+            // 높이 업데이트가 있는 경우
+            ...(updates.height !== undefined && { height: updates.height }),
+            // 배경색 업데이트가 있는 경우
+            ...(updates.background !== undefined && {
+              background: updates.background,
+            }),
+            // 업데이트 유저 ID
             updated_user_id: updates.updated_user_id,
           });
 
@@ -183,7 +193,6 @@ export const projectSocketHandler = (io: Server) => {
         }
       },
     );
-
     // 캔버스 생성 이벤트 핸들러 추가
     socket.on("createCanvas", async (data, callback) => {
       try {

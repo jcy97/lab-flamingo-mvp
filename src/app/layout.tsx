@@ -3,6 +3,7 @@ import "~/styles/globals.css";
 import { type Metadata } from "next";
 import AuthSession from "./AuthSession";
 import Main from "~/components/common/Main";
+import ModalPortalProvider from "~/contexts/ModalPortalContext";
 
 export const metadata: Metadata = {
   title: "Flamingo MVP",
@@ -17,8 +18,12 @@ export default function RootLayout({
     <html lang="ko">
       <body>
         <AuthSession>
-          <Main>{children}</Main>
+          <ModalPortalProvider>
+            <Main>{children}</Main>
+          </ModalPortalProvider>
         </AuthSession>
+        {/* 포탈 마운트 포인트 */}
+        <div id="portal-root"></div>
       </body>
     </html>
   );
