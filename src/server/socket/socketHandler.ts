@@ -79,7 +79,7 @@ export const projectSocketHandler = (io: Server) => {
         callback(result);
 
         // 성공했을 경우, 프로젝트의 다른 사용자들에게 페이지 추가 알림 (선택적)
-        if (result.success) {
+        if (result) {
           socket.to(project).emit("pageAdded", result.page);
         }
       } catch (error) {

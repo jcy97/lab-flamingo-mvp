@@ -12,7 +12,6 @@ import {
   currentLayersAtom,
   currentPageAtom,
   pageCanvasesAtom,
-  pageCanvasInformationAtom,
 } from "~/store/atoms";
 import { layerSocketHandler, observeLayerChanges } from "./layerYjs";
 

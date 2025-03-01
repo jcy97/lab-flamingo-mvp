@@ -9,6 +9,7 @@ import {
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
+  LayerWithContents,
   pageCanvasesAtom,
 } from "~/store/atoms";
 const store = getDefaultStore();
@@ -18,7 +19,7 @@ export const layerSocketHandler = () => {};
 // 특정 캔버스의 레이어맵 가져오기
 export const getLayersMap = (canvasId: string) => {
   const ydoc = getCanvasYdoc();
-  return ydoc ? ydoc.getMap<Layer>(`layers-${canvasId}`) : null;
+  return ydoc ? ydoc.getMap<LayerWithContents>(`layers-${canvasId}`) : null;
 };
 
 // 특정 캔버스의 모든 레이어 가져오기 (정렬된 상태로)
@@ -33,7 +34,7 @@ export const observeLayerChanges = (canvasId: string) => {
   const ydoc = getCanvasYdoc();
   if (!ydoc) return;
 
-  const layerMap = ydoc.getMap<Layer>(`layers-${canvasId}`);
+  const layerMap = ydoc.getMap<LayerWithContents>(`layers-${canvasId}`);
 
   layerMap.observe((event) => {
     // 변경된 모든 레이어 가져오기
@@ -184,7 +185,7 @@ export const addLayer = (
         canvasId: canvasId,
         project: socket.id,
         layerData: {
-          name: `Layer ${layers.length + 1}`,
+          name: `레이어 ${layers.length + 1}`,
           created_user_id: session.user.id,
           updated_user_id: session.user.id,
         },
@@ -270,7 +271,7 @@ export const reorderLayer = (
       }
       return null;
     })
-    .filter(Boolean) as Layer[];
+    .filter(Boolean) as LayerWithContents[];
 
   // 트랜잭션으로 일괄 처리
   doc.transact(() => {

@@ -105,7 +105,7 @@ export const updateProjectName = async (
  *
  * @param userId - 프로젝트를 생성하는 사용자 ID
  * @param projectId - 생성된 프로젝트의 UUID (선택적 매개변수)
- * @returns {Promise<any>} 생성된 프로젝트, 페이지 및 캔버스의 정보
+ * @returns {Promise<any>} 생성된 프로젝트, 페이지, 캔버스, 레이어 및 레이어 컨텐츠의 정보
  * @throws {Error} 생성 과정에서 발생한 에러를 던짐
  */
 export const createProjectWithDefaults = async (
@@ -145,14 +145,26 @@ export const createProjectWithDefaults = async (
         },
       });
 
-      // 4. 기본 레이어 생성 [신규 추가 부분]
+      // 4. 기본 레이어 생성
       const defaultLayer = await tx.layer.create({
         data: {
           name: "레이어 1",
           index: 0,
+          type: "NORMAL", // 명시적으로 NORMAL 타입 설정
           canvas_id: defaultCanvas.id,
           created_user_id: userId,
           updated_user_id: userId,
+        },
+      });
+
+      // 5. 기본 레이어 컨텐츠 생성 (NORMAL 타입)
+      const defaultLayerContent = await tx.layerContent.create({
+        data: {
+          layer_id: defaultLayer.id,
+          position_x: 0,
+          position_y: 0,
+          rotation: 0,
+          normal_data: {}, // 빈 객체로 초기화 (필요에 따라 기본값 설정 가능)
         },
       });
 
@@ -160,7 +172,8 @@ export const createProjectWithDefaults = async (
         project: newProject,
         page: defaultPage,
         canvas: defaultCanvas,
-        layer: defaultLayer, // 결과에 레이어 추가
+        layer: defaultLayer,
+        layerContent: defaultLayerContent, // 결과에 레이어 컨텐츠 추가
       };
     });
 

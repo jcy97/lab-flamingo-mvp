@@ -41,15 +41,16 @@ export default function PageLayout({
   }, [scaleFactor]);
 
   useEffect(() => {
+    if (status !== "authenticated") return;
+
     const projectId = currentProject?.uuid || projectIdinUrl;
-    if (status !== "authenticated" || !projectId) return;
+    if (!projectId) return;
 
     const initialize = async () => {
       setIsLoading(true);
-      // 기존 소켓 연결 해제
       await disconnectSocket();
-      const projectId = currentProject ? currentProject.uuid : projectIdinUrl;
       await initProjectSocket(projectId, user!);
+      setIsLoading(false);
     };
 
     initialize();
@@ -57,7 +58,7 @@ export default function PageLayout({
     return () => {
       disconnectSocket();
     };
-  }, [status, projectIdinUrl, currentProject?.uuid, user?.user.id]);
+  }, [status, projectIdinUrl, currentProject?.uuid]);
 
   if (isLoading) {
     return <LoadingSpinner />;

@@ -32,6 +32,9 @@ export const selectPagesWithCanvases = async (projectId: string) => {
               orderBy: {
                 index: "asc",
               },
+              include: {
+                layer_content: true, // 레이어 콘텐츠 포함
+              },
             },
           },
         },
@@ -68,24 +71,25 @@ export const updatePagesOrder = async (
   return true;
 };
 /**
- * 프로젝트 내에 새로운 페이지, 캔버스, 레이어를 순차적으로 생성하는 함수
- * @param {string} projectId - 프로젝트 ID
- * @param {Object} pageData - 페이지 생성 데이터
+ * 기본 캔버스와 레이어를 포함하여 새 페이지를 생성하는 함수
+ *
+ * @param projectId - 페이지가 속할 프로젝트의 ID
+ * @param userId - 페이지를 생성하는 사용자 ID
+ * @param pageIndex - 생성할 페이지의 인덱스 (선택적 매개변수)
+ * @param pageName - 생성할 페이지의 이름 (선택적 매개변수)
+ * @returns {Promise<any>} 생성된 페이지, 캔버스, 레이어 및 레이어 컨텐츠의 정보
+ * @throws {Error} 생성 과정에서 발생한 에러를 던짐
  */
 export const createNewPageWithDefaults = async (
   projectId: string,
   pageData: {
     id: string;
     name: string;
-    created_user_id: string;
-    updated_user_id: string;
+    user_id: string;
   },
 ) => {
   try {
-    console.log("페이지 저장");
-    console.log(pageData);
     const result = await mongo.$transaction(async (tx) => {
-      // 기존 페이지 수 계산하여 인덱스 설정
       const existingPagesCount = await tx.page.count({
         where: { project_id: projectId },
       });
@@ -96,8 +100,8 @@ export const createNewPageWithDefaults = async (
           name: pageData.name,
           index: existingPagesCount + 1, // 기존 페이지 개수를 인덱스로 사용 (맨 뒤에 추가)
           project_id: projectId,
-          created_user_id: pageData.created_user_id,
-          updated_user_id: pageData.updated_user_id,
+          created_user_id: pageData.user_id,
+          updated_user_id: pageData.user_id,
           created_at: new Date(),
           updated_at: new Date(),
         },
@@ -109,32 +113,46 @@ export const createNewPageWithDefaults = async (
           name: "캔버스 1",
           index: 0,
           page_id: newPage.id,
-          created_user_id: pageData.created_user_id,
-          updated_user_id: pageData.updated_user_id,
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_user_id: pageData.user_id,
+          updated_user_id: pageData.user_id,
         },
       });
 
+      // 3. 기본 레이어 생성
       const defaultLayer = await tx.layer.create({
         data: {
           name: "레이어 1",
           index: 0,
+          type: "NORMAL", // 명시적으로 NORMAL 타입 설정
           canvas_id: defaultCanvas.id,
-          created_user_id: pageData.created_user_id,
-          updated_user_id: pageData.updated_user_id,
-          created_at: new Date(),
-          updated_at: new Date(),
+          created_user_id: pageData.user_id,
+          updated_user_id: pageData.user_id,
         },
       });
 
-      // 4. 결과 객체 조립
+      // 4. 기본 레이어 컨텐츠 생성 (NORMAL 타입)
+      const defaultLayerContent = await tx.layerContent.create({
+        data: {
+          layer_id: defaultLayer.id,
+          position_x: 0,
+          position_y: 0,
+          rotation: 0,
+          normal_data: {}, // 빈 객체로 초기화 (필요에 따라 기본값 설정 가능)
+        },
+      });
+
+      // 5. 결과 객체 조립
       const completePage: PageWithCanvases = {
         ...newPage,
         page_canvases: [
           {
             ...defaultCanvas,
-            canvas_layers: [defaultLayer],
+            canvas_layers: [
+              {
+                ...defaultLayer,
+                layer_content: defaultLayerContent, // 레이어 컨텐츠 추가
+              },
+            ],
           },
         ],
       };
@@ -147,14 +165,10 @@ export const createNewPageWithDefaults = async (
       page: result,
     };
   } catch (error) {
-    console.error("페이지 생성 중 오류 발생:", error);
-    return {
-      success: false,
-      error: "페이지 생성에 실패했습니다.",
-    };
+    console.error("페이지 생성 중 에러가 발생하였습니다:", error);
+    throw error;
   }
 };
-
 /**
  * 특정 페이지의 정보를 업데이트하는 함수
  *
@@ -410,6 +424,7 @@ export const createCanvas = async (
         data: {
           name: "레이어 1",
           index: 0,
+          type: "NORMAL", // 명시적으로 NORMAL 타입 설정
           canvas_id: newCanvas.id,
           created_user_id: canvasData.created_user_id,
           updated_user_id: canvasData.updated_user_id,
@@ -418,10 +433,26 @@ export const createCanvas = async (
         },
       });
 
-      // 3. 생성된 캔버스와 레이어 정보를 포함하여 반환
+      // 3. 기본 레이어 컨텐츠 생성 (NORMAL 타입)
+      const defaultLayerContent = await tx.layerContent.create({
+        data: {
+          layer_id: defaultLayer.id,
+          position_x: 0,
+          position_y: 0,
+          rotation: 0,
+          normal_data: {}, // 빈 객체로 초기화 (필요에 따라 기본값 설정 가능)
+        },
+      });
+
+      // 4. 생성된 캔버스, 레이어 및 레이어 컨텐츠 정보를 포함하여 반환
       return {
         ...newCanvas,
-        canvas_layers: [defaultLayer],
+        canvas_layers: [
+          {
+            ...defaultLayer,
+            layer_content: defaultLayerContent,
+          },
+        ],
       };
     });
 

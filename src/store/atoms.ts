@@ -1,6 +1,6 @@
 import { atom } from "jotai";
 import { Project } from "~/schemas";
-import { Canvas, Page, Layer } from "@prisma/mongodb-client";
+import { Canvas, Page, Layer, LayerContent } from "@prisma/mongodb-client";
 import { CurrentConnectedUser } from "~/types/types";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 
@@ -8,7 +8,10 @@ export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
 };
 export type CanvasWithLayers = Canvas & {
-  canvas_layers: Layer[];
+  canvas_layers: LayerWithContents[];
+};
+export type LayerWithContents = Layer & {
+  layer_content: LayerContent;
 };
 // 전역 로딩 상태 관리
 export const isLoadingAtom = atom<Boolean>(false);
@@ -46,16 +49,16 @@ export const currentPageAtom = atom<Page>();
 export const currentCanvasesAtom = atom<CanvasWithLayers[]>([]);
 
 //캔버스별 레이어 리스트
-export const canvasLayersAtom = atom<Record<string, Layer[]>>({});
+export const canvasLayersAtom = atom<Record<string, LayerWithContents[]>>({});
 
 //현재 사용자가 선택한 캔버스
 export const currentCanvasAtom = atom<CanvasWithLayers>();
 
 //현재 사용자가 선택한 캔버스의 레이어 리스트
-export const currentLayersAtom = atom<Layer[]>([]);
+export const currentLayersAtom = atom<LayerWithContents[]>([]);
 
 //현재 사용자가 선택한 레이어
-export const currentLayerAtom = atom<Layer>();
+export const currentLayerAtom = atom<LayerWithContents>();
 
 //현재 프로젝트 접속 중인 사용자
 export const currentConnectedUserAtom = atom<CurrentConnectedUser[]>([]);
@@ -66,3 +69,15 @@ export const pageSelectedCanvasMapAtom = atom<Record<string, string>>({});
 
 // 캔버스별 선택된 레이어 ID를 저장하는 atom
 export const canvasSelectedLayerMapAtom = atom<Record<string, string>>({});
+
+// 브러시 속성 관리를 위한 아톰
+export const brushPropertiesAtom = atom({
+  color: "#000000", // 브러시 색상
+  size: 5, // 브러시 크기 (픽셀)
+  opacity: 1, // 브러시 불투명도 (0~1)
+  smoothing: 0.5, // 브러시 부드러움 (0~1)
+  pressure: true, // 압력 감지 활성화 여부
+  blendMode: "normal", // 브러시 혼합 모드
+  type: "round", // 브러시 유형 (round, square, texture)
+  texture: null, // 텍스처 브러시용 이미지 URL
+});

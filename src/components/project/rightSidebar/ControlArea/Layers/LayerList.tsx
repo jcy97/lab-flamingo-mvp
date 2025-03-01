@@ -30,13 +30,17 @@ const LayerList: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    console.log(currentLayer?.layer_content);
+  }, [currentLayer]);
+
+  useEffect(() => {
     if (editingLayerId && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
   }, [editingLayerId]);
 
-  // Outside click handler to close menu
+  // 레이어 팝업 닫기 (외부영역 클릭 시)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {

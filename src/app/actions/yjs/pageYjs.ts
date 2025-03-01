@@ -236,8 +236,7 @@ export const addPage = (
       project: projectId,
       pageData: {
         name: pageName,
-        created_user_id: session.user.id,
-        updated_user_id: session.user.id,
+        user_id: session.user.id,
       },
     },
     (response: any) => {

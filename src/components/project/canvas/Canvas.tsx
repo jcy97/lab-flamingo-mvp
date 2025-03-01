@@ -5,9 +5,39 @@ import {
   currentCanvasAtom,
   currentToolbarItemAtom,
   scaleFactorAtom,
+  currentLayersAtom,
+  currentLayerAtom,
+  canvasSelectedLayerMapAtom,
+  LayerWithContents,
 } from "~/store/atoms";
-import { Stage, Layer, Text, Rect } from "react-konva";
+import { Stage, Layer } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
+import { Canvas as CanvasType } from "@prisma/mongodb-client";
+import Konva from "konva";
+import Brush from "./Layer/Brush";
+import { brushPropertiesAtom } from "~/store/atoms";
+
+// Define Canvas with Layers type
+export interface CanvasWithLayers extends CanvasType {
+  canvas_layers: LayerWithContents[];
+}
+
+// Layer update payload interface
+interface LayerUpdatePayload {
+  layerId: string;
+  normalData: {
+    brushData: string;
+  };
+}
+
+// Layer updates record type
+interface LayerUpdatesRecord {
+  [key: string]: {
+    normalData?: {
+      brushData: string;
+    };
+  };
+}
 
 // 최소 및 최대 스케일 값 정의
 const MIN_SCALE = 0.1; // 최소 스케일 (10%)
@@ -18,36 +48,55 @@ const ZOOM_OUT_FACTOR = 0.8; // 줌 아웃 시 20% 감소
 const WHEEL_ZOOM_SENSITIVITY = 0.05;
 
 const Canvas: React.FC = () => {
-  const currentCanvas = useAtomValue(currentCanvasAtom);
-  const [isMounted, setIsMounted] = useState(false);
+  const currentCanvas = useAtomValue(currentCanvasAtom) as
+    | CanvasWithLayers
+    | undefined;
+  const currentLayers = useAtomValue(currentLayersAtom) as LayerWithContents[];
+  const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const currentToolbarItem = useAtomValue(currentToolbarItemAtom);
   const [scaleFactor, setScaleFactor] = useAtom(scaleFactorAtom);
+  const [canvasSelectedLayerMap, setCanvasSelectedLayerMap] = useAtom(
+    canvasSelectedLayerMapAtom,
+  );
 
-  // 캔버스 위치 상태 추가
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [lastPointerPosition, setLastPointerPosition] = useState({
+  // 캔버스 위치 상태
+  const [position, setPosition] = useState<{ x: number; y: number }>({
     x: 0,
     y: 0,
   });
-  const [isSpacePressed, setIsSpacePressed] = useState(false);
-
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [lastPointerPosition, setLastPointerPosition] = useState<{
+    x: number;
+    y: number;
+  }>({
+    x: 0,
+    y: 0,
+  });
+  const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [recentlyFinishedSpacebarDrag, setRecentlyFinishedSpacebarDrag] =
-    useState(false);
+    useState<boolean>(false);
+
+  // 레이어 변경 추적
+  const [layerUpdates, setLayerUpdates] = useState<LayerUpdatesRecord>({});
+
+  // 임시 모드 상태
+  const [temporaryZoomIn, setTemporaryZoomIn] = useState<boolean>(false);
+  const [temporaryZoomOut, setTemporaryZoomOut] = useState<boolean>(false);
 
   // Stage와 컨테이너에 대한 참조
-  const stageRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const stageRef = useRef<Konva.Stage | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   // 윈도우 크기에 맞게 초기 스케일 조정하는 함수
-  const adjustInitialScale = () => {
+  const adjustInitialScale = (): void => {
     if (!currentCanvas || !containerRef.current) return;
 
     const containerWidth = containerRef.current.clientWidth;
     const containerHeight = containerRef.current.clientHeight;
 
     // 화면 가장자리에 여백을 주기 위한 패딩 값
-    const padding = 40;
+    const padding = 120;
     const availableWidth = containerWidth - padding;
     const availableHeight = containerHeight - padding;
 
@@ -70,14 +119,35 @@ const Canvas: React.FC = () => {
   };
 
   // 스케일 변경 함수 - 모든 줌 작업에 사용
-  const changeScale = (newScale: number) => {
+  const changeScale = (newScale: number): void => {
     // MIN_SCALE과 MAX_SCALE 사이로 제한
     const clampedScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
     setScaleFactor(clampedScale);
   };
 
+  // 레이어 업데이트 핸들러
+  const handleLayerUpdate = ({
+    layerId,
+    normalData,
+  }: LayerUpdatePayload): void => {
+    // 레이어 업데이트 상태 저장
+    setLayerUpdates((prev) => ({
+      ...prev,
+      [layerId]: {
+        ...prev[layerId],
+        normalData,
+      },
+    }));
+
+    // 여기서 서버로 데이터를 저장하는 API 호출을 추가할 수 있습니다.
+    // 예: saveLayerContent(layerId, normalData);
+
+    // 개발 단계에서 콘솔에 로그
+    console.log(`Layer ${layerId} updated with brush data`);
+  };
+
   // 클릭 이벤트 핸들러
-  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>): void => {
     // 임시 확대 모드가 활성화된 경우
     if (temporaryZoomIn) {
       // 새 스케일 계산 (20% 증가)
@@ -105,8 +175,8 @@ const Canvas: React.FC = () => {
     }
   };
 
-  //휠 이벤트
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  // 휠 이벤트
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>): void => {
     // 스페이스바 쿨다운 기간 중 휠 이벤트 무시
     if (recentlyFinishedSpacebarDrag) {
       e.preventDefault();
@@ -136,7 +206,7 @@ const Canvas: React.FC = () => {
   };
 
   // 마우스 다운 이벤트 핸들러 - 드래그 시작
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
     // 임시 확대/축소 모드일 경우 드래그 방지
     if (temporaryZoomIn || temporaryZoomOut) {
       return;
@@ -153,7 +223,7 @@ const Canvas: React.FC = () => {
   };
 
   // 마우스 이동 이벤트 핸들러 - 드래그 중
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
     if (!isDragging) return;
 
     const newPosition = {
@@ -169,25 +239,21 @@ const Canvas: React.FC = () => {
   };
 
   // 마우스 업 이벤트 핸들러 - 드래그 종료
-  const handleMouseUp = () => {
+  const handleMouseUp = (): void => {
     setIsDragging(false);
   };
 
   // 마우스가 컨테이너를 벗어났을 때 드래그 종료
-  const handleMouseLeave = () => {
+  const handleMouseLeave = (): void => {
     setIsDragging(false);
   };
-
-  // 임시 모드 상태 추가
-  const [temporaryZoomIn, setTemporaryZoomIn] = useState(false);
-  const [temporaryZoomOut, setTemporaryZoomOut] = useState(false);
 
   // 키보드 이벤트 핸들러 - 스페이스 키 감지 및 단축키 처리
   useEffect(() => {
     // 현재 활성화된 키의 상태를 관리하기 위한 객체
     const activeKeys: Record<string, boolean> = {};
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent): void => {
       // 키 상태 업데이트
       activeKeys[e.code] = true;
 
@@ -212,7 +278,7 @@ const Canvas: React.FC = () => {
       }
     };
 
-    const handleKeyUp = (e: KeyboardEvent) => {
+    const handleKeyUp = (e: KeyboardEvent): void => {
       // 키 상태 업데이트
       activeKeys[e.code] = false;
 
@@ -249,14 +315,15 @@ const Canvas: React.FC = () => {
     };
   }, []);
 
+  // 컴포넌트 마운트 시 초기화
   useEffect(() => {
     setIsMounted(true);
     adjustInitialScale();
-  }, [currentCanvas]);
+  }, [currentCanvas, containerRef]);
 
   // 윈도우 크기가 변경될 때 스케일 업데이트
   useEffect(() => {
-    const handleResize = () => {
+    const handleResize = (): void => {
       adjustInitialScale();
     };
 
@@ -269,7 +336,7 @@ const Canvas: React.FC = () => {
     // 기존 meta 태그 찾기
     let metaTag = document.querySelector(
       'meta[name="viewport"]',
-    ) as HTMLMetaElement;
+    ) as HTMLMetaElement | null;
 
     // 기존 태그가 없으면 생성
     if (!metaTag) {
@@ -286,7 +353,12 @@ const Canvas: React.FC = () => {
 
     // 컴포넌트 언마운트 시 원래 상태로 복원
     return () => {
-      metaTag.setAttribute("content", "width=device-width, initial-scale=1.0");
+      if (metaTag) {
+        metaTag.setAttribute(
+          "content",
+          "width=device-width, initial-scale=1.0",
+        );
+      }
     };
   }, []);
 
@@ -294,10 +366,15 @@ const Canvas: React.FC = () => {
     return null;
   }
 
+  // 현재 선택된 레이어 ID
+  const selectedLayerId =
+    currentLayer?.id ||
+    (currentCanvas && canvasSelectedLayerMap[currentCanvas.id]);
+
   const isTransparent = currentCanvas.background === "TRANSPARENT";
 
   // 마우스 커서 스타일 결정
-  const getCursorStyle = () => {
+  const getCursorStyle = (): string => {
     // 임시 확대/축소 모드 우선 처리
     if (temporaryZoomIn) return "zoom-in";
     if (temporaryZoomOut) return "zoom-out";
@@ -308,6 +385,9 @@ const Canvas: React.FC = () => {
       return "grab";
     if (currentToolbarItem === ToolbarItemIDs.ZOOM_IN) return "zoom-in";
     if (currentToolbarItem === ToolbarItemIDs.ZOOM_OUT) return "zoom-out";
+
+    // 브러시 도구 선택 시
+    if (currentToolbarItem === ToolbarItemIDs.BRUSH) return "crosshair";
     return "default";
   };
 
@@ -353,22 +433,37 @@ const Canvas: React.FC = () => {
             height={currentCanvas.height}
             scaleX={scaleFactor}
             scaleY={scaleFactor}
-            attrs={{
-              originalWidth: currentCanvas.width,
-              originalHeight: currentCanvas.height,
-            }}
+            onMouseDown={(e) => e.evt.preventDefault()}
+            onTouchStart={(e) => e.evt.preventDefault()}
           >
-            <Layer>
-              <Text text="콘바콘바테스트" fontSize={100} x={300} y={300} />
-              <Rect
-                x={300}
-                y={300}
-                width={100}
-                height={100}
-                fill="red"
-                shadowBlur={10}
-              />
-            </Layer>
+            {/* 레이어 렌더링 */}
+            {currentLayers && currentLayers.length > 0 && (
+              <Layer>
+                {/* 레이어 순서대로 렌더링 (인덱스 낮은 것부터) */}
+                {[...currentLayers]
+                  .sort((a, b) => a.index - b.index)
+                  .map((layer) => {
+                    // 레이어 타입에 따라 다른 컴포넌트 렌더링
+                    if (layer.type === "NORMAL" && layer.layer_content) {
+                      return (
+                        <Brush
+                          key={layer.id}
+                          layer={layer}
+                          isSelected={layer.id === selectedLayerId}
+                          canvasWidth={currentCanvas.width}
+                          canvasHeight={currentCanvas.height}
+                          scale={scaleFactor}
+                          onUpdate={handleLayerUpdate}
+                          stageRef={stageRef}
+                          isSpacePressed={isSpacePressed} // 스페이스바 상태 전달
+                        />
+                      );
+                    }
+                    // 다른 타입의 레이어에 대한 처리 추가 가능
+                    return null;
+                  })}
+              </Layer>
+            )}
           </Stage>
         </div>
       </div>

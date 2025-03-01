@@ -50,10 +50,35 @@ model Layer {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   name            String
   index           Int
+  type            String   @default("NORMAL")   // "NORMAL", "SHAPE", "TEXT", "IMAGE",
+  visible         Boolean  @default(true)
+  opacity         Float    @default(1.0)
+  blend_mode      String   @default("NORMAL") // normal, multiply, screen, overlay, etc.
+  locked          Boolean  @default(false)
   created_at      DateTime @default(now())
   created_user_id String
   updated_at      DateTime @updatedAt
   updated_user_id String   
   canvas          Canvas   @relation(fields: [canvas_id], references: [id])
-  canvas_id       String   
+  canvas_id       String
+  parent_layer_id String?  @db.ObjectId // 그룹 레이어용
+  child_layers    Layer[]  @relation("LayerToLayer")
+  parent_layer    Layer?   @relation("LayerToLayer", fields: [parent_layer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  layer_content   LayerContent?
+}
+
+model LayerContent {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  layer_id        String   @unique @db.ObjectId
+  layer           Layer    @relation(fields: [layer_id], references: [id], onDelete: Cascade)
+  // Common properties that might be used across different layer types
+  position_x      Float    @default(0)
+  position_y      Float    @default(0)
+  rotation        Float    @default(0)
+  
+  // Type-specific properties stored in JSON
+  normal_data      Json?    // 일반 레이어 데아터 (브러쉬 등..)
+  shape_data      Json?    // For shape layers
+  text_data       Json?    // For text layers
+  image_data      Json?    // For image layers
 }

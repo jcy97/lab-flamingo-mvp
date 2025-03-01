@@ -16,43 +16,57 @@ export const createLayer = async (
   },
 ) => {
   try {
-    // 해당 캔버스의 모든 레이어 조회하여 최대 인덱스 값 찾기
-    const existingLayers = await mongo.layer.findMany({
-      where: {
-        canvas_id: canvasId,
-      },
-    });
-
-    // 최대 인덱스 값 찾기
-    let maxIndex = -1;
-    if (existingLayers.length > 0) {
-      maxIndex = Math.max(...existingLayers.map((layer) => layer.index));
-    }
-
-    // 새 레이어의 인덱스 설정 (기존 레이어가 없으면 0, 있으면 최대 인덱스 + 1)
-    const newIndex = maxIndex + 1;
-
-    // 레이어 생성
-    const newLayer = await mongo.layer.create({
-      data: {
-        name: layerData.name,
-        index: newIndex,
-        created_user_id: layerData.created_user_id,
-        updated_user_id: layerData.updated_user_id,
-        created_at: new Date(),
-        updated_at: new Date(),
-        canvas: {
-          connect: {
-            id: canvasId,
-          },
+    return await mongo.$transaction(async (tx) => {
+      // 해당 캔버스의 모든 레이어 조회하여 최대 인덱스 값 찾기
+      const existingLayers = await tx.layer.findMany({
+        where: {
+          canvas_id: canvasId,
         },
-      },
-    });
+      });
 
-    return {
-      success: true,
-      layer: newLayer,
-    };
+      // 최대 인덱스 값 찾기
+      let maxIndex = -1;
+      if (existingLayers.length > 0) {
+        maxIndex = Math.max(...existingLayers.map((layer) => layer.index));
+      }
+
+      // 새 레이어의 인덱스 설정 (기존 레이어가 없으면 0, 있으면 최대 인덱스 + 1)
+      const newIndex = maxIndex + 1;
+
+      // 1. 레이어 생성 (항상 NORMAL 타입으로 생성)
+      const newLayer = await tx.layer.create({
+        data: {
+          name: layerData.name,
+          index: newIndex,
+          type: "NORMAL", // 항상 NORMAL 타입으로 고정
+          created_user_id: layerData.created_user_id,
+          updated_user_id: layerData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+          canvas_id: canvasId,
+        },
+      });
+
+      // 2. 레이어 컨텐츠 생성 (항상 normal_data 포함)
+      const layerContent = await tx.layerContent.create({
+        data: {
+          layer_id: newLayer.id,
+          position_x: 0,
+          position_y: 0,
+          rotation: 0,
+          normal_data: {}, // NORMAL 타입을 위한 빈 객체로 초기화
+        },
+      });
+
+      // 생성된 레이어와 레이어 컨텐츠 정보 반환
+      return {
+        success: true,
+        layer: {
+          ...newLayer,
+          layer_content: layerContent,
+        },
+      };
+    });
   } catch (error) {
     console.error("레이어 생성 실패:", error);
     return {
