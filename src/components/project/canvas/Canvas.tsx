@@ -22,26 +22,37 @@ export interface CanvasWithLayers extends CanvasType {
   canvas_layers: LayerWithContents[];
 }
 
-// Layer update payload interface
+// 레이어 업데이트 인터페이스 수정 (lines 배열로 변경)
 interface LayerUpdatePayload {
   layerId: string;
   normalData: {
-    brushData: string;
+    lines: LineData[];
   };
 }
 
-// Layer updates record type
+// LineData 인터페이스 추가
+interface LineData {
+  points: number[];
+  stroke: string;
+  strokeWidth: number;
+  tension: number;
+  lineCap: "round" | "square";
+  lineJoin: "round" | "miter";
+  opacity: number;
+}
+
+// Layer updates record type 수정
 interface LayerUpdatesRecord {
   [key: string]: {
     normalData?: {
-      brushData: string;
+      lines: LineData[];
     };
   };
 }
 
 // 최소 및 최대 스케일 값 정의
 const MIN_SCALE = 0.1; // 최소 스케일 (10%)
-const MAX_SCALE = 5; // 최대 스케일 (500%)
+const MAX_SCALE = 2; // 최대 스케일 (200%)
 const ZOOM_IN_FACTOR = 1.2; // 줌 인 시 20% 증가
 const ZOOM_OUT_FACTOR = 0.8; // 줌 아웃 시 20% 감소
 
@@ -77,7 +88,7 @@ const Canvas: React.FC = () => {
   const [recentlyFinishedSpacebarDrag, setRecentlyFinishedSpacebarDrag] =
     useState<boolean>(false);
 
-  // 레이어 변경 추적
+  // 레이어 변경 추적 (lines 배열로 수정)
   const [layerUpdates, setLayerUpdates] = useState<LayerUpdatesRecord>({});
 
   // 임시 모드 상태
@@ -125,7 +136,7 @@ const Canvas: React.FC = () => {
     setScaleFactor(clampedScale);
   };
 
-  // 레이어 업데이트 핸들러
+  // 레이어 업데이트 핸들러 (lines 배열 형식으로 수정)
   const handleLayerUpdate = ({
     layerId,
     normalData,
@@ -143,7 +154,7 @@ const Canvas: React.FC = () => {
     // 예: saveLayerContent(layerId, normalData);
 
     // 개발 단계에서 콘솔에 로그
-    console.log(`Layer ${layerId} updated with brush data`);
+    console.log(`Layer ${layerId} updated with lines data`);
   };
 
   // 클릭 이벤트 핸들러
@@ -175,7 +186,6 @@ const Canvas: React.FC = () => {
     }
   };
 
-  // 휠 이벤트
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>): void => {
     // 스페이스바 쿨다운 기간 중 휠 이벤트 무시
     if (recentlyFinishedSpacebarDrag) {
@@ -185,6 +195,9 @@ const Canvas: React.FC = () => {
 
     // 브라우저의 기본 줌 동작 방지
     e.preventDefault();
+
+    // 스테이지 참조가 없으면 리턴
+    if (!stageRef.current) return;
 
     // ctrl 키와 함께 사용되는 경우 핀치 제스처로 간주 (맥북)
     const isPinchGesture = e.ctrlKey || e.metaKey;
@@ -201,8 +214,14 @@ const Canvas: React.FC = () => {
     // 음수 deltaY는 확대, 양수 deltaY는 축소
     const zoomFactor = 1 - e.deltaY * sensitivity;
 
-    // 현재 스케일에 조정 값 적용
-    changeScale(scaleFactor * zoomFactor);
+    // 현재 스케일에 조정 값 적용 (MIN_SCALE과 MAX_SCALE 사이로 제한)
+    const newScale = Math.min(
+      Math.max(scaleFactor * zoomFactor, MIN_SCALE),
+      MAX_SCALE,
+    );
+
+    // 스케일 변경
+    setScaleFactor(newScale);
   };
 
   // 마우스 다운 이벤트 핸들러 - 드래그 시작
@@ -391,6 +410,9 @@ const Canvas: React.FC = () => {
     return "default";
   };
 
+  // 수정해야 할 핵심 부분만 포함합니다
+
+  // 1. Stage와 컨테이너 구조 수정
   return (
     <div
       ref={containerRef}
@@ -400,7 +422,7 @@ const Canvas: React.FC = () => {
         minHeight: "100%",
         minWidth: "100%",
         cursor: getCursorStyle(),
-        touchAction: "none", // 브라우저 기본 터치 액션 비활성화
+        touchAction: "none",
       }}
       onClick={handleCanvasClick}
       onWheel={handleWheel}
@@ -411,26 +433,24 @@ const Canvas: React.FC = () => {
     >
       <div
         style={{
-          width: currentCanvas.width * scaleFactor,
-          height: currentCanvas.height * scaleFactor,
           transform: `translate(${position.x}px, ${position.y}px)`,
+          transformOrigin: "top left",
         }}
       >
         {/* 배경 컨테이너 */}
         <div
           style={{
-            width: "100%",
-            height: "100%",
+            width: currentCanvas.width * scaleFactor,
+            height: currentCanvas.height * scaleFactor,
             background: isTransparent ? "" : currentCanvas.background,
             position: "relative",
           }}
           className={isTransparent ? "bg-checkerboard" : ""}
         >
-          {/* Konva 스테이지 */}
           <Stage
             ref={stageRef}
-            width={currentCanvas.width}
-            height={currentCanvas.height}
+            width={currentCanvas.width * scaleFactor}
+            height={currentCanvas.height * scaleFactor}
             scaleX={scaleFactor}
             scaleY={scaleFactor}
             onMouseDown={(e) => e.evt.preventDefault()}
@@ -438,7 +458,11 @@ const Canvas: React.FC = () => {
           >
             {/* 레이어 렌더링 */}
             {currentLayers && currentLayers.length > 0 && (
-              <Layer>
+              <Layer
+                // Layer의 이미지 품질 개선
+                imageSmoothingEnabled={true}
+                clipFunc={undefined}
+              >
                 {/* 레이어 순서대로 렌더링 (인덱스 낮은 것부터) */}
                 {[...currentLayers]
                   .sort((a, b) => a.index - b.index)
@@ -455,11 +479,12 @@ const Canvas: React.FC = () => {
                           scale={scaleFactor}
                           onUpdate={handleLayerUpdate}
                           stageRef={stageRef}
-                          isSpacePressed={isSpacePressed} // 스페이스바 상태 전달
+                          isSpacePressed={isSpacePressed}
+                          // 브러시 스트로크가 캔버스 경계를 벗어나도 렌더링되도록 설정
+                          listening={true}
                         />
                       );
                     }
-                    // 다른 타입의 레이어에 대한 처리 추가 가능
                     return null;
                   })}
               </Layer>
