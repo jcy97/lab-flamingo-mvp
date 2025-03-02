@@ -2,7 +2,6 @@ import { Session } from "next-auth";
 import { getCanvasYdoc } from "./canvasYjs";
 import { getDefaultStore } from "jotai";
 import { projectSocketAtom } from "~/store/yjsAtoms";
-import { Layer } from "@prisma/mongodb-client";
 import {
   canvasLayersAtom,
   canvasSelectedLayerMapAtom,
@@ -12,6 +11,8 @@ import {
   LayerWithContents,
   pageCanvasesAtom,
 } from "~/store/atoms";
+
+import { LayerContent } from "@prisma/mongodb-client";
 const store = getDefaultStore();
 
 export const layerSocketHandler = () => {};
@@ -328,7 +329,7 @@ export const deleteLayer = (canvasId: string, layerId: string) => {
   if (!layerToDelete) return;
 
   // 현재 선택된 레이어와 삭제할 레이어가 같은지 확인하기 위한 저장소 접근
-  const store = getDefaultStore();
+
   const currentLayer = store.get(currentLayerAtom);
   const currentCanvas = store.get(currentCanvasAtom);
 
@@ -384,5 +385,47 @@ export const deleteLayer = (canvasId: string, layerId: string) => {
         }
       },
     );
+  }
+};
+
+export const saveLayerContent = (
+  canvasId: string,
+  layerId: string,
+  data: LayerContent,
+  session: Session,
+) => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return;
+
+  const doc = getCanvasYdoc();
+  if (!doc) return;
+
+  // 현재 레이어 상태 가져오기
+  const layers = getLayers(canvasId);
+  if (!layers) return;
+
+  const layer = layersMap.get(layerId);
+  if (!layer) return;
+
+  doc.transact(() => {
+    // 변경된 레이어 객체 생성
+    const updatedLayer = {
+      ...layer,
+      layer_content: data,
+    };
+
+    // 캔버스 맵에 업데이트된 캔버스 저장
+    layersMap.set(layerId, updatedLayer);
+  });
+  const socket = store.get(projectSocketAtom);
+
+  // 서버에 업데이트 전송
+  if (socket) {
+    socket.emit("updateLayerContent", {
+      canvasId,
+      layerId,
+      data,
+      updatedBy: session.user.id,
+    });
   }
 };

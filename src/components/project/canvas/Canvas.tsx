@@ -12,11 +12,13 @@ import {
 } from "~/store/atoms";
 import { Stage, Layer } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
-import { Canvas as CanvasType } from "@prisma/mongodb-client";
+import { Canvas as CanvasType, LayerContent } from "@prisma/mongodb-client";
 import Konva from "konva";
 import Brush from "./Layer/Brush";
 import { brushPropertiesAtom } from "~/store/atoms";
 import BrushCursor from "./Layer/BurshCurosr";
+import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
+import { useSession } from "next-auth/react";
 
 // Define Canvas with Layers type
 export interface CanvasWithLayers extends CanvasType {
@@ -42,15 +44,6 @@ interface LineData {
   opacity: number;
 }
 
-// Layer updates record type 수정
-interface LayerUpdatesRecord {
-  [key: string]: {
-    normalData?: {
-      lines: LineData[];
-    };
-  };
-}
-
 // 최소 및 최대 스케일 값 정의
 const MIN_SCALE = 0.1; // 최소 스케일 (10%)
 const MAX_SCALE = 2; // 최대 스케일 (200%)
@@ -60,6 +53,8 @@ const ZOOM_OUT_FACTOR = 0.8; // 줌 아웃 시 20% 감소
 const WHEEL_ZOOM_SENSITIVITY = 0.05;
 
 const Canvas: React.FC = () => {
+  const { data: user } = useSession();
+
   const currentCanvas = useAtomValue(currentCanvasAtom) as
     | CanvasWithLayers
     | undefined;
@@ -90,9 +85,6 @@ const Canvas: React.FC = () => {
   const [isSpacePressed, setIsSpacePressed] = useState<boolean>(false);
   const [recentlyFinishedSpacebarDrag, setRecentlyFinishedSpacebarDrag] =
     useState<boolean>(false);
-
-  // 레이어 변경 추적 (lines 배열로 수정)
-  const [layerUpdates, setLayerUpdates] = useState<LayerUpdatesRecord>({});
 
   // 임시 모드 상태
   const [temporaryZoomIn, setTemporaryZoomIn] = useState<boolean>(false);
@@ -139,25 +131,10 @@ const Canvas: React.FC = () => {
     setScaleFactor(clampedScale);
   };
 
-  // 레이어 업데이트 핸들러 (lines 배열 형식으로 수정)
-  const handleLayerUpdate = ({
-    layerId,
-    normalData,
-  }: LayerUpdatePayload): void => {
-    // 레이어 업데이트 상태 저장
-    setLayerUpdates((prev) => ({
-      ...prev,
-      [layerId]: {
-        ...prev[layerId],
-        normalData,
-      },
-    }));
-
-    // 여기서 서버로 데이터를 저장하는 API 호출을 추가할 수 있습니다.
-    // 예: saveLayerContent(layerId, normalData);
-
-    // 개발 단계에서 콘솔에 로그
-    console.log(`Layer ${layerId} updated with lines data`);
+  // 레이어 업데이트 핸들러
+  const handleLayerUpdate = (layerId: string, data: LayerContent): void => {
+    //서버에 데이터 저장
+    saveLayerContent(currentCanvas!.id, layerId, data, user!);
   };
 
   // 클릭 이벤트 핸들러

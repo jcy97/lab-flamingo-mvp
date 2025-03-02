@@ -6,29 +6,12 @@ import { currentToolbarItemAtom, brushPropertiesAtom } from "~/store/atoms";
 import { useAtomValue } from "jotai";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
+import { LineData } from "~/types/types";
+import { useSession } from "next-auth/react";
 
 // 레이어 컨텐츠
 export interface LayerWithContents extends Layer {
   layer_content: LayerContent | null;
-}
-
-// 레이어 업데이트
-interface LayerUpdatePayload {
-  layerId: string;
-  normalData: {
-    lines: LineData[];
-  };
-}
-
-// 라인 데이터 인터페이스
-interface LineData {
-  points: number[];
-  stroke: string;
-  strokeWidth: number;
-  tension: number;
-  lineCap: "round" | "square";
-  lineJoin: "round" | "miter";
-  opacity: number;
 }
 
 interface BrushComponentProps {
@@ -38,7 +21,7 @@ interface BrushComponentProps {
   canvasHeight: number;
   stageRef: React.RefObject<Konva.Stage>;
   scale: number;
-  onUpdate?: (payload: LayerUpdatePayload) => void;
+  onUpdate?: (layerId: string, data: LayerContent) => void;
   isSpacePressed?: boolean;
   listening?: boolean;
 }
@@ -46,14 +29,12 @@ interface BrushComponentProps {
 const Brush: React.FC<BrushComponentProps> = ({
   layer,
   isSelected,
-  canvasWidth,
-  canvasHeight,
   scale,
   stageRef,
   onUpdate,
   isSpacePressed = false,
-  listening = false,
 }) => {
+  const { data: user, status } = useSession();
   // 그려진 라인들을 저장할 상태
   const [lines, setLines] = useState<LineData[]>([]);
   // 현재 그리는 중인 라인
@@ -66,6 +47,7 @@ const Brush: React.FC<BrushComponentProps> = ({
 
   // 레이어 데이터 초기화 및 복원
   useEffect(() => {
+    if (status !== "authenticated") return;
     if (
       layer.layer_content?.normal_data &&
       typeof layer.layer_content.normal_data === "object"
@@ -182,14 +164,24 @@ const Brush: React.FC<BrushComponentProps> = ({
         setLines(updatedLines);
         setCurrentLine(null);
 
-        // 레이어 데이터 업데이트
+        if (!layer.layer_content) return;
+
         if (onUpdate) {
-          onUpdate({
-            layerId: layer.id,
-            normalData: {
-              lines: updatedLines,
-            },
-          });
+          const updatedLayerContent = {
+            id: layer.layer_content.id,
+            layer_id: layer.layer_content.layer_id,
+            position_x: layer.layer_content.position_x,
+            position_y: layer.layer_content.position_y,
+            rotation: layer.layer_content.rotation,
+            normal_data: {
+              lines: updatedLines, // 업데이트된 라인으로 교체
+            } as Record<string, any>,
+            shape_data: layer.layer_content.shape_data,
+            text_data: layer.layer_content.text_data,
+            image_data: layer.layer_content.image_data,
+          };
+
+          onUpdate(layer.id, updatedLayerContent);
         }
       }
     };

@@ -263,3 +263,64 @@ export const deleteLayer = async (layerId: string, canvasId: string) => {
     };
   }
 };
+
+/**
+ * 레이어 컨텐츠를 업데이트하는 함수
+ *
+ * @param {string} layerId - 업데이트할 레이어의 ID
+ * @param {Object} data - 업데이트할 레이어 컨텐츠 데이터
+ * @param {string} updatedBy - 업데이트를 수행한 사용자의 ID
+ * @returns {Promise<Object>} - 업데이트 결과와 성공 여부
+ */
+export const updateLayerContent = async (
+  layerId: string,
+  data: any,
+  updatedBy: string,
+) => {
+  try {
+    // 레이어 존재 확인
+    const layer = await mongo.layer.findUnique({
+      where: { id: layerId },
+      include: { layer_content: true },
+    });
+
+    if (!layer) {
+      return {
+        success: false,
+        error: "레이어를 찾을 수 없습니다.",
+      };
+    }
+
+    // 레이어 정보 업데이트 (업데이트 시간 및 사용자)
+    await mongo.layer.update({
+      where: { id: layerId },
+      data: {
+        updated_at: new Date(),
+        updated_user_id: updatedBy,
+      },
+    });
+    const contentData = { ...data };
+    delete contentData.id;
+    delete contentData.layer_id;
+    // 레이어 컨텐츠 업데이트 또는 생성
+    let updatedContent;
+    if (layer.layer_content) {
+      console.log("레이어 컨텐츠 저장");
+      updatedContent = await mongo.layerContent.update({
+        where: { layer_id: layerId },
+        data: contentData,
+      });
+    }
+
+    return {
+      success: true,
+      layerContent: updatedContent,
+    };
+  } catch (error) {
+    console.error("레이어 컨텐츠 업데이트 실패:", error);
+    return {
+      success: false,
+      error: "레이어 컨텐츠 업데이트에 실패했습니다.",
+    };
+  }
+};

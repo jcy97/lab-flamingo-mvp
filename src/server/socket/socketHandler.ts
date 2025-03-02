@@ -20,6 +20,7 @@ import {
   deleteLayer,
   reorderLayers,
   updateLayer,
+  updateLayerContent,
 } from "../service/layer";
 
 // 소켓 이벤트 핸들러 함수 정의
@@ -379,7 +380,34 @@ export const projectSocketHandler = (io: Server) => {
         }
       },
     );
+    // 레이어 컨텐츠 업데이트 이벤트 핸들러
+    socket.on(
+      "updateLayerContent",
+      async ({ canvasId, layerId, data, updatedBy }) => {
+        try {
+          // 레이어 컨텐츠 업데이트 함수 호출
+          const result = await updateLayerContent(layerId, data, updatedBy);
+          // 요청한 클라이언트에게만 결과 알림 (성공/실패)
+          socket.emit("layerContentUpdated", {
+            success: result.success,
+            layerId,
+            canvasId,
+            layerContent: result.success ? result.layerContent : null,
+            error: result.error,
+          });
 
+          // Y.js가 동기화를 처리하므로 다른 클라이언트에게 추가 알림은 불필요
+        } catch (error) {
+          console.error("레이어 컨텐츠 업데이트 처리 실패:", error);
+          socket.emit("layerContentUpdated", {
+            success: false,
+            layerId,
+            canvasId,
+            error: "레이어 컨텐츠 업데이트 처리에 실패했습니다.",
+          });
+        }
+      },
+    );
     socket.on("disconnect", () => {
       console.log("사용자 연결이 종료되었습니다.");
       const response = removeConnectedUser(socket.id);

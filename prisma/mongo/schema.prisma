@@ -77,7 +77,7 @@ model LayerContent {
   rotation        Float    @default(0)
   
   // Type-specific properties stored in JSON
-  normal_data      Json?    // 일반 레이어 데아터 (브러쉬 등..)
+  normal_data      Json?    // 일반 레이어 데이터 (브러쉬 등..)
   shape_data      Json?    // For shape layers
   text_data       Json?    // For text layers
   image_data      Json?    // For image layers
