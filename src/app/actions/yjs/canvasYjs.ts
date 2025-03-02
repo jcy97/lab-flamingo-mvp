@@ -5,6 +5,7 @@ import { SOCKET_URL } from "~/constants/socket";
 import { getDefaultStore } from "jotai";
 import { canvasYdocAtom, projectSocketAtom } from "~/store/yjsAtoms";
 import {
+  canvasLayersAtom,
   CanvasWithLayers,
   currentCanvasAtom,
   currentCanvasesAtom,
@@ -162,6 +163,29 @@ export const observeCanvasChanges = () => {
       (a, b) => a.index - b.index,
     );
 
+    // canvasLayersAtom 업데이트
+    const canvasLayers = store.get(canvasLayersAtom);
+    const updatedCanvasLayers = { ...canvasLayers };
+
+    // 추가되거나 변경된 캔버스의 레이어 정보 업데이트
+    updatedCanvases.forEach((canvas) => {
+      if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+        updatedCanvasLayers[canvas.id] = canvas.canvas_layers;
+      } else if (!updatedCanvasLayers[canvas.id]) {
+        updatedCanvasLayers[canvas.id] = [];
+      }
+    });
+
+    // 삭제된 캔버스의 레이어 정보 제거
+    Object.keys(updatedCanvasLayers).forEach((canvasId) => {
+      if (!updatedCanvases.some((canvas) => canvas.id === canvasId)) {
+        delete updatedCanvasLayers[canvasId];
+      }
+    });
+
+    store.set(canvasLayersAtom, updatedCanvasLayers);
+
+    // 기존 코드는 그대로 유지
     // 현재 선택된 페이지 정보 가져오기
     const currentPage = store.get(currentPageAtom);
 
