@@ -299,13 +299,14 @@ export const updateLayerContent = async (
         updated_user_id: updatedBy,
       },
     });
+
     const contentData = { ...data };
     delete contentData.id;
     delete contentData.layer_id;
+
     // 레이어 컨텐츠 업데이트 또는 생성
     let updatedContent;
     if (layer.layer_content) {
-      console.log("레이어 컨텐츠 저장");
       updatedContent = await mongo.layerContent.update({
         where: { layer_id: layerId },
         data: contentData,

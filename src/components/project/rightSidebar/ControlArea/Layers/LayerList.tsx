@@ -143,7 +143,7 @@ const LayerList: React.FC = () => {
   return (
     <div className="flex h-full w-full flex-col gap-1 overflow-y-auto">
       {layers
-        .sort((a, b) => a.index - b.index)
+        .sort((a, b) => b.index - a.index)
         .map((layer, index) => (
           <section
             key={layer.id}
