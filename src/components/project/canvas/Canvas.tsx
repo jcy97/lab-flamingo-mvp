@@ -16,6 +16,7 @@ import { Canvas as CanvasType } from "@prisma/mongodb-client";
 import Konva from "konva";
 import Brush from "./Layer/Brush";
 import { brushPropertiesAtom } from "~/store/atoms";
+import BrushCursor from "./Layer/BurshCurosr";
 
 // Define Canvas with Layers type
 export interface CanvasWithLayers extends CanvasType {
@@ -65,7 +66,9 @@ const Canvas: React.FC = () => {
   const currentLayers = useAtomValue(currentLayersAtom) as LayerWithContents[];
   const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
   const [isMounted, setIsMounted] = useState<boolean>(false);
-  const currentToolbarItem = useAtomValue(currentToolbarItemAtom);
+  const [currentToolbarItem, setCurrentToolbarItem] = useAtom(
+    currentToolbarItemAtom,
+  );
   const [scaleFactor, setScaleFactor] = useAtom(scaleFactorAtom);
   const [canvasSelectedLayerMap, setCanvasSelectedLayerMap] = useAtom(
     canvasSelectedLayerMapAtom,
@@ -280,6 +283,14 @@ const Canvas: React.FC = () => {
       if (e.code === "Space" && !e.repeat) {
         setIsSpacePressed(true);
       }
+      // B 키를 눌렀을 때 브러시 도구 선택
+      if (e.code === "KeyB" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        setCurrentToolbarItem(ToolbarItemIDs.BRUSH);
+      }
+      // V 키를 눌렀을 때 선택 도구 선택
+      if (e.code === "KeyV" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        setCurrentToolbarItem(ToolbarItemIDs.SELECT);
+      }
 
       // Windows: Ctrl+Space, macOS: 스포트라이트 충돌 방지를 위해 Ctrl+Space로 통일
       // 임시 확대 모드 활성화
@@ -421,8 +432,13 @@ const Canvas: React.FC = () => {
         overflow: "hidden",
         minHeight: "100%",
         minWidth: "100%",
-        cursor: getCursorStyle(),
-        touchAction: "none",
+        cursor: isSpacePressed
+          ? isDragging
+            ? "grabbing"
+            : "grab"
+          : currentToolbarItem === ToolbarItemIDs.BRUSH
+            ? "none"
+            : getCursorStyle(),
       }}
       onClick={handleCanvasClick}
       onWheel={handleWheel}
@@ -431,6 +447,11 @@ const Canvas: React.FC = () => {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
+      {/* //브러쉬 모드용 커서 */}
+      <BrushCursor
+        containerRef={containerRef}
+        isSpacePressed={isSpacePressed}
+      />
       <div
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
