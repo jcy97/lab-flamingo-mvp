@@ -76,10 +76,11 @@ const Brush: React.FC<BrushComponentProps> = ({
       return;
     }
 
+    // Brush.tsx 파일 내 handleMouseDown 함수 수정
     const handleMouseDown = (
       e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
     ) => {
-      // 이벤트 버블링 중지 (중요!)
+      // 이벤트 버블링 중지
       e.cancelBubble = true;
 
       isDrawingRef.current = true;
@@ -87,20 +88,25 @@ const Brush: React.FC<BrushComponentProps> = ({
       if (!pos) {
         return;
       }
+
       // 스테이지의 변환 매트릭스를 사용한 정확한 위치 계산
       const transform = stage.getAbsoluteTransform().copy().invert();
       const point = transform.point(pos);
 
-      // 새 라인 생성 (strokeWidth에 scale 반영하지 않음 - 스테이지에서 자동으로 조정됨)
+      // 지우개 모드인지 확인
+      const isEraser = currentToolbarItem === ToolbarItemIDs.ERASER;
+
+      // 새 라인 생성
       const newLine: LineData = {
         points: [point.x, point.y],
-        stroke: brushProps.color,
+        stroke: isEraser ? "#000000" : brushProps.color,
         strokeWidth: brushProps.size,
         tension: brushProps.smoothing * 0.5,
         lineCap: brushProps.type === "square" ? "square" : "round",
         lineJoin: brushProps.type === "square" ? "miter" : "round",
-        opacity: brushProps.opacity * (layer.opacity || 1),
+        opacity: isEraser ? 1 : brushProps.opacity * (layer.opacity || 1),
         bezier: brushProps.smoothing > 0.3,
+        globalCompositeOperation: isEraser ? "destination-out" : "source-over",
       };
 
       setCurrentLine(newLine);
@@ -192,8 +198,12 @@ const Brush: React.FC<BrushComponentProps> = ({
       }
     };
 
-    // 브러시 도구가 선택되고 현재 레이어가 선택되었을 때만 이벤트 리스너 등록
-    if (currentToolbarItem === ToolbarItemIDs.BRUSH && isSelected) {
+    //이벤트 리스너 등록
+    if (
+      (currentToolbarItem === ToolbarItemIDs.BRUSH ||
+        currentToolbarItem === ToolbarItemIDs.ERASER) &&
+      isSelected
+    ) {
       // 먼저 이전 이벤트 리스너 모두 제거
       stage.off("mousedown touchstart", handleMouseDown);
       stage.off("mousemove touchmove", handleMouseMove);
@@ -249,6 +259,9 @@ const Brush: React.FC<BrushComponentProps> = ({
           bezier={line.bezier}
           perfectDrawEnabled={false}
           listening={false}
+          globalCompositeOperation={
+            line.globalCompositeOperation || "source-over"
+          }
         />
       ))}
 
@@ -266,6 +279,9 @@ const Brush: React.FC<BrushComponentProps> = ({
           listening={false}
           bezier={currentLine.bezier}
           strokeScaleEnabled={true}
+          globalCompositeOperation={
+            currentLine.globalCompositeOperation || "source-over"
+          }
         />
       )}
     </Group>

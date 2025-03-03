@@ -25,9 +25,14 @@ const BrushCursor: React.FC<BrushCursorProps> = ({
   // 스케일 팩터에 맞춰 커서 사이즈 계산
   const cursorSize = brushProperties.size * scaleFactor;
 
-  // 브러시 커서 노출 여부 결정
+  // 브러시 커서 노출 여부 결정 (수정된 부분)
   const isBrushMode =
-    currentToolbarItem === ToolbarItemIDs.BRUSH && !isSpacePressed;
+    (currentToolbarItem === ToolbarItemIDs.BRUSH ||
+      currentToolbarItem === ToolbarItemIDs.ERASER) &&
+    !isSpacePressed;
+
+  // 현재 지우개 모드인지 확인
+  const isEraserMode = currentToolbarItem === ToolbarItemIDs.ERASER;
 
   // 크기에 따른 증가/감소량 계산 함수
   const getSizeIncrement = (currentSize: number): number => {
@@ -133,6 +138,7 @@ const BrushCursor: React.FC<BrushCursorProps> = ({
         width: cursorSize,
         height: cursorSize,
         borderRadius: "50%",
+        // 지우개일 때는 빨간색 테두리로 표시 (선택사항)
         boxShadow: "0 0 0 1px white, 0 0 0 2px black",
         backgroundColor: "transparent",
         transform: "translate(-50%, -50%)",

@@ -284,6 +284,10 @@ const Canvas: React.FC = () => {
       if (e.code === "KeyV" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         setCurrentToolbarItem(ToolbarItemIDs.SELECT);
       }
+      // V 키를 눌렀을 때 선택 도구 선택
+      if (e.code === "KeyE" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        setCurrentToolbarItem(ToolbarItemIDs.ERASER);
+      }
 
       // Windows: Ctrl+Space, macOS: 스포트라이트 충돌 방지를 위해 Ctrl+Space로 통일
       // 임시 확대 모드 활성화
@@ -395,7 +399,8 @@ const Canvas: React.FC = () => {
           ? isDragging
             ? "grabbing"
             : "grab"
-          : currentToolbarItem === ToolbarItemIDs.BRUSH
+          : currentToolbarItem === ToolbarItemIDs.BRUSH ||
+              currentToolbarItem === ToolbarItemIDs.ERASER
             ? "none"
             : getCursorStyle(),
       }}
@@ -436,22 +441,22 @@ const Canvas: React.FC = () => {
             onMouseDown={(e) => e.evt.preventDefault()}
             onTouchStart={(e) => e.evt.preventDefault()}
           >
-            {/* 레이어 렌더링 */}
-            {currentLayers && currentLayers.length > 0 && (
-              <Layer
-                // Layer의 이미지 품질 개선
-                imageSmoothingEnabled={true}
-                clipFunc={undefined}
-              >
-                {/* 레이어 순서대로 렌더링 (인덱스 낮은 것부터) */}
-                {[...currentLayers]
-                  .sort((a, b) => a.index - b.index)
-                  .map((layer) => {
-                    // 레이어 타입에 따라 다른 컴포넌트 렌더링
-                    if (layer.type === "NORMAL" && layer.layer_content) {
-                      return (
+            {/* 레이어 순서대로 렌더링 (인덱스 낮은 것부터) */}
+            {currentLayers &&
+              currentLayers.length > 0 &&
+              [...currentLayers]
+                .sort((a, b) => a.index - b.index)
+                .map((layer) => {
+                  // 각 레이어를 별도의 Konva Layer로 렌더링
+                  if (layer.type === "NORMAL" && layer.layer_content) {
+                    return (
+                      <Layer
+                        key={`layer-${layer.id}`}
+                        visible={layer.visible}
+                        imageSmoothingEnabled={true}
+                        opacity={layer.opacity || 1}
+                      >
                         <Brush
-                          key={layer.id}
                           layer={layer}
                           isSelected={layer.id === selectedLayerId}
                           canvasWidth={currentCanvas.width}
@@ -460,15 +465,13 @@ const Canvas: React.FC = () => {
                           onUpdate={handleLayerUpdate}
                           stageRef={stageRef}
                           isSpacePressed={isSpacePressed}
-                          // 브러시 스트로크가 캔버스 경계를 벗어나도 렌더링되도록 설정
-                          listening={true}
+                          listening={layer.id === selectedLayerId}
                         />
-                      );
-                    }
-                    return null;
-                  })}
-              </Layer>
-            )}
+                      </Layer>
+                    );
+                  }
+                  return null;
+                })}
           </Stage>
         </div>
       </div>
