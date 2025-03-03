@@ -12,6 +12,7 @@ import {
   currentLayerAtom,
   currentLayersAtom,
   currentPageAtom,
+  LayerWithContents,
   pageCanvasesAtom,
 } from "~/store/atoms";
 import { layerSocketHandler, observeLayerChanges } from "./layerYjs";
@@ -520,6 +521,18 @@ export const addCanvas = (
         doc.transact(() => {
           // 캔버스 맵에 새 캔버스 추가
           canvasesMap.set(newCanvas.id, newCanvas);
+
+          // 새 캔버스의 레이어가 있다면 레이어맵에도 추가
+          if (newCanvas.canvas_layers && newCanvas.canvas_layers.length > 0) {
+            const layersMap = doc.getMap<LayerWithContents>(
+              `layers-${newCanvas.id}`,
+            );
+            newCanvas.canvas_layers.forEach((layer: LayerWithContents) => {
+              layersMap.set(layer.id, layer);
+            });
+            // 레이어 변경 감지 설정
+            observeLayerChanges(newCanvas.id);
+          }
         });
 
         // 새로 추가된 캔버스를 선택 상태로 설정

@@ -177,7 +177,6 @@ export const addLayer = (
   // 서버에 레이어 생성 요청
   const socket = store.get(projectSocketAtom);
   if (!socket) return Promise.resolve(null);
-
   // Promise로 감싸서 socket 응답을 기다리게 함
   return new Promise((resolve) => {
     socket.emit(
