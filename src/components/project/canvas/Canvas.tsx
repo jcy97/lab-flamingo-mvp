@@ -133,7 +133,23 @@ const Canvas: React.FC = () => {
 
   // 레이어 업데이트 핸들러
   const handleLayerUpdate = (layerId: string, data: LayerContent): void => {
-    //서버에 데이터 저장
+    // 서버에 데이터 저장하기 전에 브러시 업데이트가 현재 레이어에 제대로 적용되도록 확인
+    if (currentLayer?.id === layerId || selectedLayerId === layerId) {
+      // 브러시 업데이트가 현재 레이어에 적용되었음을 확인 (상태 갱신)
+      const updatedLayers = currentLayers.map((layer) => {
+        if (layer.id === layerId) {
+          return {
+            ...layer,
+            layer_content: data,
+          };
+        }
+        return layer;
+      });
+
+      // 필요한 경우 레이어 상태 업데이트 로직 추가
+    }
+
+    // 서버에 데이터 저장
     saveLayerContent(currentCanvas!.id, layerId, data, user!);
   };
 

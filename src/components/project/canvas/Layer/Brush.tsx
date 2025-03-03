@@ -67,7 +67,9 @@ const Brush: React.FC<BrushComponentProps> = ({
     }
   }, [layer.id, layer.layer_content, status]);
 
-  // 이벤트 핸들러 설정
+  // Brush.tsx의 useEffect 부분 수정
+
+  // 이벤트 핸들러 설정 (수정된 코드)
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) {
@@ -94,10 +96,11 @@ const Brush: React.FC<BrushComponentProps> = ({
         points: [point.x, point.y],
         stroke: brushProps.color,
         strokeWidth: brushProps.size,
-        tension: brushProps.smoothing,
+        tension: brushProps.smoothing * 0.5,
         lineCap: brushProps.type === "square" ? "square" : "round",
         lineJoin: brushProps.type === "square" ? "miter" : "round",
         opacity: brushProps.opacity * (layer.opacity || 1),
+        bezier: brushProps.smoothing > 0.3,
       };
 
       setCurrentLine(newLine);
@@ -191,18 +194,27 @@ const Brush: React.FC<BrushComponentProps> = ({
 
     // 브러시 도구가 선택되고 현재 레이어가 선택되었을 때만 이벤트 리스너 등록
     if (currentToolbarItem === ToolbarItemIDs.BRUSH && isSelected) {
+      // 먼저 이전 이벤트 리스너 모두 제거
+      stage.off("mousedown touchstart", handleMouseDown);
+      stage.off("mousemove touchmove", handleMouseMove);
+      stage.off("mouseup touchend", handleMouseUp);
+
+      // 새 이벤트 리스너 등록
       stage.on("mousedown touchstart", handleMouseDown);
       stage.on("mousemove touchmove", handleMouseMove);
       stage.on("mouseup touchend", handleMouseUp);
+
+      // 문서 레벨 이벤트 리스너 (마우스가 캔버스 밖으로 나갔을 때도 작동하도록)
+      document.removeEventListener("mouseup", handleMouseUp);
       document.addEventListener("mouseup", handleMouseUp);
     }
 
-    // 컴포넌트 언마운트 또는 의존성 변경 시 이벤트 리스너 제거
+    // 컴포넌트 언마운트 또는 의존성 변경 시 이벤트 리스너 제거 (명확한 제거)
     return () => {
       if (stage) {
-        stage.off("mousedown touchstart");
-        stage.off("mousemove touchmove");
-        stage.off("mouseup touchend");
+        stage.off("mousedown touchstart", handleMouseDown);
+        stage.off("mousemove touchmove", handleMouseMove);
+        stage.off("mouseup touchend", handleMouseUp);
       }
       document.removeEventListener("mouseup", handleMouseUp);
     };
@@ -218,7 +230,6 @@ const Brush: React.FC<BrushComponentProps> = ({
     currentLine,
     onUpdate,
   ]);
-
   // visible이 false인 경우 렌더링하지 않음
   if (!layer.visible) return null;
 
@@ -235,6 +246,7 @@ const Brush: React.FC<BrushComponentProps> = ({
           lineCap={line.lineCap}
           lineJoin={line.lineJoin}
           opacity={line.opacity}
+          bezier={line.bezier}
           perfectDrawEnabled={false}
           listening={false}
         />
@@ -252,6 +264,7 @@ const Brush: React.FC<BrushComponentProps> = ({
           opacity={currentLine.opacity}
           perfectDrawEnabled={false}
           listening={false}
+          bezier={currentLine.bezier}
           strokeScaleEnabled={true}
         />
       )}

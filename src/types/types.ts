@@ -29,6 +29,7 @@ export interface LineData {
   lineCap: "round" | "square";
   lineJoin: "round" | "miter";
   opacity: number;
+  bezier?: boolean;
 }
 
 // 실시간 브러시 상태를 나타내는 인터페이스
