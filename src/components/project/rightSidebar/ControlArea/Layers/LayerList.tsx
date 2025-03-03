@@ -30,10 +30,6 @@ const LayerList: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    console.log(currentLayer?.layer_content);
-  }, [currentLayer]);
-
-  useEffect(() => {
     if (editingLayerId && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();

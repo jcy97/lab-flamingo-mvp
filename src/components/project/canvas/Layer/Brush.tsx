@@ -2,7 +2,11 @@
 import { useRef, useEffect, useState } from "react";
 import { Line, Group } from "react-konva";
 import { Layer, LayerContent } from "@prisma/mongodb-client";
-import { currentToolbarItemAtom, brushPropertiesAtom } from "~/store/atoms";
+import {
+  currentToolbarItemAtom,
+  brushPropertiesAtom,
+  currentLayerAtom,
+} from "~/store/atoms";
 import { useAtomValue } from "jotai";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
@@ -41,6 +45,7 @@ const Brush: React.FC<BrushComponentProps> = ({
   const [currentLine, setCurrentLine] = useState<LineData | null>(null);
   // 그리기 모드 상태
   const isDrawingRef = useRef(false);
+  const currentLayer = useAtomValue(currentLayerAtom);
 
   const currentToolbarItem = useAtomValue(currentToolbarItemAtom);
   const brushProps = useAtomValue(brushPropertiesAtom);
@@ -60,30 +65,26 @@ const Brush: React.FC<BrushComponentProps> = ({
         setLines(normalData.lines as LineData[]);
       }
     }
-  }, [layer.id, layer.layer_content]);
+  }, [layer.id, layer.layer_content, status]);
 
   // 이벤트 핸들러 설정
   useEffect(() => {
     const stage = stageRef.current;
-    if (!stage) return;
+    if (!stage) {
+      return;
+    }
 
     const handleMouseDown = (
       e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
     ) => {
-      if (
-        isSpacePressed ||
-        currentToolbarItem !== ToolbarItemIDs.BRUSH ||
-        !isSelected ||
-        layer.locked ||
-        !layer.visible
-      ) {
-        return;
-      }
+      // 이벤트 버블링 중지 (중요!)
+      e.cancelBubble = true;
 
       isDrawingRef.current = true;
       const pos = stage.getPointerPosition();
-      if (!pos) return;
-
+      if (!pos) {
+        return;
+      }
       // 스테이지의 변환 매트릭스를 사용한 정확한 위치 계산
       const transform = stage.getAbsoluteTransform().copy().invert();
       const point = transform.point(pos);
@@ -164,7 +165,9 @@ const Brush: React.FC<BrushComponentProps> = ({
         setLines(updatedLines);
         setCurrentLine(null);
 
-        if (!layer.layer_content) return;
+        if (!layer.layer_content) {
+          return;
+        }
 
         if (onUpdate) {
           const updatedLayerContent = {
@@ -186,21 +189,15 @@ const Brush: React.FC<BrushComponentProps> = ({
       }
     };
 
-    // 브러시 선택 시에만 이벤트 리스너 활성화
+    // 브러시 도구가 선택되고 현재 레이어가 선택되었을 때만 이벤트 리스너 등록
     if (currentToolbarItem === ToolbarItemIDs.BRUSH && isSelected) {
       stage.on("mousedown touchstart", handleMouseDown);
       stage.on("mousemove touchmove", handleMouseMove);
       stage.on("mouseup touchend", handleMouseUp);
-
-      // 스테이지 밖으로 마우스가 나가도 드로잉이 끝나도록 처리
       document.addEventListener("mouseup", handleMouseUp);
-    } else {
-      stage.off("mousedown touchstart");
-      stage.off("mousemove touchmove");
-      stage.off("mouseup touchend");
-      document.removeEventListener("mouseup", handleMouseUp);
     }
 
+    // 컴포넌트 언마운트 또는 의존성 변경 시 이벤트 리스너 제거
     return () => {
       if (stage) {
         stage.off("mousedown touchstart");
@@ -210,12 +207,10 @@ const Brush: React.FC<BrushComponentProps> = ({
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [
+    currentLayer,
     currentToolbarItem,
     isSelected,
-    layer.id,
-    layer.locked,
-    layer.visible,
-    layer.opacity,
+    layer,
     isSpacePressed,
     brushProps,
     scale,

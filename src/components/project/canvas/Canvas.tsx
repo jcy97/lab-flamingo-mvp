@@ -338,37 +338,6 @@ const Canvas: React.FC = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, [currentCanvas]);
 
-  // meta 태그 추가를 위한 useEffect
-  useEffect(() => {
-    // 기존 meta 태그 찾기
-    let metaTag = document.querySelector(
-      'meta[name="viewport"]',
-    ) as HTMLMetaElement | null;
-
-    // 기존 태그가 없으면 생성
-    if (!metaTag) {
-      metaTag = document.createElement("meta");
-      metaTag.setAttribute("name", "viewport");
-      document.head.appendChild(metaTag);
-    }
-
-    // maximum-scale과 user-scalable 속성 설정
-    metaTag.setAttribute(
-      "content",
-      "width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no",
-    );
-
-    // 컴포넌트 언마운트 시 원래 상태로 복원
-    return () => {
-      if (metaTag) {
-        metaTag.setAttribute(
-          "content",
-          "width=device-width, initial-scale=1.0",
-        );
-      }
-    };
-  }, []);
-
   if (!currentCanvas || !isMounted) {
     return null;
   }
@@ -398,9 +367,6 @@ const Canvas: React.FC = () => {
     return "default";
   };
 
-  // 수정해야 할 핵심 부분만 포함합니다
-
-  // 1. Stage와 컨테이너 구조 수정
   return (
     <div
       ref={containerRef}
