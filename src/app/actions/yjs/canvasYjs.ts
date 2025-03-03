@@ -164,17 +164,24 @@ export const observeCanvasChanges = () => {
       (a, b) => a.index - b.index,
     );
 
-    // canvasLayersAtom 업데이트
+    // canvasLayersAtom 업데이트 - 기존 레이어 정보 유지하면서 변경
     const canvasLayers = store.get(canvasLayersAtom);
+    console.log("체크");
+    console.log(canvasLayers);
     const updatedCanvasLayers = { ...canvasLayers };
 
-    // 추가되거나 변경된 캔버스의 레이어 정보 업데이트
+    // 추가되거나 변경된 캔버스에 대해 레이어가 없는 경우에만 업데이트
     updatedCanvases.forEach((canvas) => {
-      if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
-        updatedCanvasLayers[canvas.id] = canvas.canvas_layers;
-      } else if (!updatedCanvasLayers[canvas.id]) {
-        updatedCanvasLayers[canvas.id] = [];
+      // 기존에 레이어 정보가 없는 캔버스의 경우에만 canvas_layers 정보 사용
+      if (!updatedCanvasLayers[canvas.id]) {
+        // 새 캔버스가 추가된 경우
+        if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+          updatedCanvasLayers[canvas.id] = canvas.canvas_layers;
+        } else {
+          updatedCanvasLayers[canvas.id] = [];
+        }
       }
+      // 이미 레이어 정보가 있는 경우는 그대로 유지 (레이어 옵저버에서 관리)
     });
 
     // 삭제된 캔버스의 레이어 정보 제거
@@ -184,9 +191,11 @@ export const observeCanvasChanges = () => {
       }
     });
 
-    store.set(canvasLayersAtom, updatedCanvasLayers);
+    // 변경된 내용이 있는 경우에만 상태 업데이트
+    if (JSON.stringify(canvasLayers) !== JSON.stringify(updatedCanvasLayers)) {
+      store.set(canvasLayersAtom, updatedCanvasLayers);
+    }
 
-    // 기존 코드는 그대로 유지
     // 현재 선택된 페이지 정보 가져오기
     const currentPage = store.get(currentPageAtom);
 
@@ -221,7 +230,14 @@ export const observeCanvasChanges = () => {
 
       // 선택된 캔버스가 업데이트된 경우만 업데이트
       if (updatedCurrentCanvas) {
-        store.set(currentCanvasAtom, updatedCurrentCanvas);
+        // 중요: canvas_layers 정보는 현재 레이어 상태를 유지
+        const updatedCanvas = {
+          ...updatedCurrentCanvas,
+          // 기존 canvas_layers 유지 (YJS의 레이어 정보는 그대로 복원)
+          canvas_layers: currentCanvas.canvas_layers,
+        };
+
+        store.set(currentCanvasAtom, updatedCanvas);
       }
     } else {
       // 선택된 캔버스가 없는 경우 (최초 로드 또는 새 캔버스 추가 시)

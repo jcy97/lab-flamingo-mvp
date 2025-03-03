@@ -13,6 +13,7 @@ import {
   deleteLayer,
   renameLayer,
   reorderLayer,
+  toggleLayerVisibility,
 } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 
@@ -95,6 +96,18 @@ const LayerList: React.FC = () => {
     }
   };
 
+  // 레이어 가시성 토글 처리
+  const handleVisibilityToggle = (
+    e: React.MouseEvent,
+    layerId: string,
+    isVisible: boolean,
+  ) => {
+    e.stopPropagation(); // 레이어 선택 이벤트 방지
+    if (currentCanvas && session) {
+      toggleLayerVisibility(currentCanvas.id, layerId, isVisible, session);
+    }
+  };
+
   // 설정 메뉴 토글
   const toggleMenu = (e: React.MouseEvent, layerId: string) => {
     e.stopPropagation(); // 레이어 선택 이벤트 방지
@@ -161,7 +174,19 @@ const LayerList: React.FC = () => {
             }`}
           >
             <div className="flex h-full w-[40px] items-center justify-center border-r border-neutral-100 p-2">
-              <IoMdEye className="text-neutral-100" size={22} />
+              {layer.visible !== false ? (
+                <IoMdEye
+                  className="text-neutral-100 hover:cursor-pointer"
+                  size={22}
+                  onClick={(e) => handleVisibilityToggle(e, layer.id, false)}
+                />
+              ) : (
+                <IoMdEyeOff
+                  className="text-neutral-100 hover:cursor-pointer"
+                  size={22}
+                  onClick={(e) => handleVisibilityToggle(e, layer.id, true)}
+                />
+              )}
             </div>
             <div className="flex flex-1 items-center gap-2 overflow-hidden px-3 py-2">
               <div className="h-[40px] w-[45px] flex-shrink-0 bg-neutral-100"></div>

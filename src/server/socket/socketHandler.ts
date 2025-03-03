@@ -19,6 +19,7 @@ import {
   createLayer,
   deleteLayer,
   reorderLayers,
+  toggleLayerVisibility,
   updateLayer,
   updateLayerContent,
 } from "../service/layer";
@@ -404,6 +405,40 @@ export const projectSocketHandler = (io: Server) => {
             layerId,
             canvasId,
             error: "레이어 컨텐츠 업데이트 처리에 실패했습니다.",
+          });
+        }
+      },
+    );
+
+    // 레이어 가시성 토글 이벤트 핸들러
+    socket.on(
+      "toggleLayerVisibility",
+      async ({ canvasId, layerId, isVisible, updatedBy }) => {
+        try {
+          // 레이어 가시성 업데이트 함수 호출
+          const result = await toggleLayerVisibility(
+            layerId,
+            isVisible,
+            updatedBy,
+          );
+
+          // 요청한 클라이언트에게 결과 알림 (성공/실패)
+          socket.emit("layerVisibilityUpdated", {
+            success: result.success,
+            layerId,
+            canvasId,
+            layer: result.success ? result.layer : null,
+            error: result.error,
+          });
+
+          // Y.js가 동기화를 처리하므로 다른 클라이언트에게 추가 알림은 불필요
+        } catch (error) {
+          console.error("레이어 가시성 업데이트 처리 실패:", error);
+          socket.emit("layerVisibilityUpdated", {
+            success: false,
+            layerId,
+            canvasId,
+            error: "레이어 가시성 업데이트 처리에 실패했습니다.",
           });
         }
       },

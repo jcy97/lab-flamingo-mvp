@@ -47,7 +47,7 @@ const CanvasList: React.FC = () => {
   // 캔버스가 변경될 때 레이어 관련 처리
   useEffect(() => {
     if (currentCanvas && canvasLayers[currentCanvas.id]) {
-      // 현재 캔버스의 레이어 목록 설정
+      // 현재 캔버스의 레이어 목록 설정 - 항상 최신 상태를 사용
       const layers = canvasLayers[currentCanvas.id] || [];
       setCurrentLayers(layers);
 
@@ -57,7 +57,16 @@ const CanvasList: React.FC = () => {
         currentLayer.canvas_id === currentCanvas.id &&
         layers.some((layer) => layer.id === currentLayer.id)
       ) {
-        // 이미 적절한 레이어가 선택되어 있으므로 아무것도 하지 않음
+        // 현재 레이어가 업데이트되었는지 확인하고, 업데이트되었다면 최신 버전으로 갱신
+        const updatedCurrentLayer = layers.find(
+          (layer) => layer.id === currentLayer.id,
+        );
+        if (
+          updatedCurrentLayer &&
+          JSON.stringify(currentLayer) !== JSON.stringify(updatedCurrentLayer)
+        ) {
+          setCurrentLayer(updatedCurrentLayer);
+        }
         return;
       }
 

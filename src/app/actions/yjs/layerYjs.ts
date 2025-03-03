@@ -55,7 +55,8 @@ export const observeLayerChanges = (canvasId: string) => {
       ...canvasLayers,
       [canvasId]: updatedLayers,
     });
-
+    console.log("업데이트");
+    console.log(updatedLayers);
     // pageCanvasesAtom 업데이트
     const pageCanvases = store.get(pageCanvasesAtom);
 
@@ -424,6 +425,53 @@ export const saveLayerContent = (
       canvasId,
       layerId,
       data,
+      updatedBy: session.user.id,
+    });
+  }
+};
+
+export const toggleLayerVisibility = (
+  canvasId: string,
+  layerId: string,
+  isVisible: boolean,
+  session: Session,
+) => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return;
+
+  const doc = getCanvasYdoc();
+  if (!doc) return;
+
+  // 현재 레이어 객체 가져오기
+  const layer = layersMap.get(layerId);
+  if (!layer) return;
+
+  // 가시성이 이미 같으면 진행하지 않음
+  if (layer.visible === isVisible) return;
+
+  // 소켓 가져오기
+  const socket = store.get(projectSocketAtom);
+
+  doc.transact(() => {
+    // 변경된 레이어 객체 생성
+    const updatedLayer = {
+      ...layer,
+      visible: isVisible,
+      updated_user_id: session.user.id,
+      updated_at: new Date(),
+    };
+    console.log(1111);
+    console.log(updatedLayer);
+    // 캔버스 맵에 업데이트된 레이어 저장
+    layersMap.set(layerId, updatedLayer);
+  });
+
+  // 서버에 업데이트 전송
+  if (socket) {
+    socket.emit("toggleLayerVisibility", {
+      canvasId,
+      layerId,
+      isVisible,
       updatedBy: session.user.id,
     });
   }

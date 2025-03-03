@@ -325,3 +325,52 @@ export const updateLayerContent = async (
     };
   }
 };
+
+/**
+ * 레이어 가시성을 토글하는 함수
+ *
+ * @param {string} layerId - 가시성을 토글할 레이어의 ID
+ * @param {boolean} isVisible - 설정할 가시성 상태
+ * @param {string} updatedBy - 업데이트를 수행한 사용자의 ID
+ * @returns {Promise<Object>} - 업데이트 결과와 성공 여부
+ */
+export const toggleLayerVisibility = async (
+  layerId: string,
+  isVisible: boolean,
+  updatedBy: string,
+) => {
+  try {
+    // 레이어 존재 확인
+    const layer = await mongo.layer.findUnique({
+      where: { id: layerId },
+    });
+
+    if (!layer) {
+      return {
+        success: false,
+        error: "레이어를 찾을 수 없습니다.",
+      };
+    }
+
+    // 레이어 가시성 업데이트
+    const updatedLayer = await mongo.layer.update({
+      where: { id: layerId },
+      data: {
+        visible: isVisible,
+        updated_at: new Date(),
+        updated_user_id: updatedBy,
+      },
+    });
+
+    return {
+      success: true,
+      layer: updatedLayer,
+    };
+  } catch (error) {
+    console.error("레이어 가시성 업데이트 실패:", error);
+    return {
+      success: false,
+      error: "레이어 가시성 업데이트에 실패했습니다.",
+    };
+  }
+};
