@@ -19,6 +19,7 @@ import { brushPropertiesAtom } from "~/store/atoms";
 import BrushCursor from "./Layer/BurshCurosr";
 import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
+import UserMousePointers from "~/components/common/user/UserMousePointers";
 
 // Define Canvas with Layers type
 export interface CanvasWithLayers extends CanvasType {
@@ -411,17 +412,23 @@ const Canvas: React.FC = () => {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseLeave}
     >
-      {/* //브러쉬 모드용 커서 */}
+      {/* 브러쉬 모드용 커서 */}
       <BrushCursor
         containerRef={containerRef}
         isSpacePressed={isSpacePressed}
       />
+
       <div
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           transformOrigin: "top left",
         }}
       >
+        {/* 다른 사용자들의 마우스 포인터 - 스테이지와 같은 레벨에 배치 */}
+        {currentCanvas && stageRef.current && (
+          <UserMousePointers stageRef={stageRef} canvasId={currentCanvas.id} />
+        )}
+
         {/* 배경 컨테이너 */}
         <div
           style={{
