@@ -186,13 +186,8 @@ const Canvas: React.FC = () => {
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>): void => {
     // 스페이스바 쿨다운 기간 중 휠 이벤트 무시
     if (recentlyFinishedSpacebarDrag) {
-      e.preventDefault();
       return;
     }
-
-    // 브라우저의 기본 줌 동작 방지
-    e.preventDefault();
-
     // 스테이지 참조가 없으면 리턴
     if (!stageRef.current) return;
 

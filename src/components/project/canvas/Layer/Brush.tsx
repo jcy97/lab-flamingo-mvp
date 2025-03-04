@@ -71,10 +71,13 @@ const Brush: React.FC<BrushComponentProps> = ({
     let animationFrameId: number;
     const updateFrame = () => {
       const drawingLines = getOtherUsersDrawingLines();
-      setOtherUsersDrawingLines(drawingLines);
+      if (
+        JSON.stringify(drawingLines) !== JSON.stringify(otherUsersDrawingLines)
+      ) {
+        setOtherUsersDrawingLines(drawingLines);
+      }
       animationFrameId = requestAnimationFrame(updateFrame);
     };
-
     // 정리 함수
     animationFrameId = requestAnimationFrame(updateFrame);
 
