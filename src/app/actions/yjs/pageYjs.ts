@@ -3,7 +3,11 @@ import * as Y from "yjs";
 import { SocketIOProvider } from "y-socket.io";
 import { SOCKET_URL } from "~/constants/socket";
 import { getDefaultStore } from "jotai";
-import { pageYdocAtom, projectSocketAtom } from "~/store/yjsAtoms";
+import {
+  pageYdocAtom,
+  projectSocketAtom,
+  yjsProviderAtom,
+} from "~/store/yjsAtoms";
 import { Page } from "@prisma/mongodb-client";
 import {
   canvasLayersAtom,
@@ -42,9 +46,13 @@ export const initPageYjs = (project: string, session: Session) => {
   const yPagesMap = ydoc.getMap<Page>("pagesMap");
 
   wsProvider.on("status", ({ status }: { status: string }) => {
-    console.log(status); // Logs "connected" or "disconnected"
+    // Status "connected" or "disconnected"
+    if (status === "connected") {
+      store.set(yjsProviderAtom, wsProvider);
+    } else if (status === "dusconnected") {
+      store.set(yjsProviderAtom, null);
+    }
   });
-  type PageType = Omit<PageWithCanvases, "page_canvases">;
 
   // 서버 데이터와 YJS 동기화 함수
   socket!.emit(

@@ -7,7 +7,6 @@ import { currentConnectedUserAtom } from "~/store/atoms";
 import { initPageYjs } from "./yjs/pageYjs";
 import { projectSocketAtom } from "~/store/yjsAtoms";
 import { initCanvasYjs } from "./yjs/canvasYjs";
-import { SocketIOProvider } from "y-socket.io";
 
 const store = getDefaultStore();
 
@@ -46,7 +45,6 @@ export const initProjectSocket = async (project: string, session: Session) => {
     // 기존 이벤트 리스너 제거 후 재등록
     socket.off("updateUserList");
     socket.on("updateUserList", (data) => {
-      console.log("사용자 리스트 도착");
       store.set(currentConnectedUserAtom, data);
     });
   } catch (error) {

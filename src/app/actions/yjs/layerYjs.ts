@@ -55,8 +55,6 @@ export const observeLayerChanges = (canvasId: string) => {
       ...canvasLayers,
       [canvasId]: updatedLayers,
     });
-    console.log("업데이트");
-    console.log(updatedLayers);
     // pageCanvasesAtom 업데이트
     const pageCanvases = store.get(pageCanvasesAtom);
 

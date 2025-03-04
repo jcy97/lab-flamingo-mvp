@@ -7,11 +7,16 @@ import {
   brushPropertiesAtom,
   currentLayerAtom,
 } from "~/store/atoms";
-import { useAtomValue } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
 import { LineData } from "~/types/types";
 import { useSession } from "next-auth/react";
+import {
+  initBrushAwareness,
+  updateDrawingAwareness,
+  cleanupDrawingAwareness,
+} from "~/app/actions/yjs/brushYjs";
 
 // 레이어 컨텐츠
 export interface LayerWithContents extends Layer {
@@ -43,6 +48,12 @@ const Brush: React.FC<BrushComponentProps> = ({
   const [lines, setLines] = useState<LineData[]>([]);
   // 현재 그리는 중인 라인
   const [currentLine, setCurrentLine] = useState<LineData | null>(null);
+
+  // 다른 사용자들이 그리는 중인 라인들
+  const [otherUsersDrawingLines, setOtherUsersDrawingLines] = useState<{
+    [userId: string]: LineData;
+  }>({});
+
   // 그리기 모드 상태
   const isDrawingRef = useRef(false);
   const currentLayer = useAtomValue(currentLayerAtom);
@@ -50,9 +61,33 @@ const Brush: React.FC<BrushComponentProps> = ({
   const currentToolbarItem = useAtomValue(currentToolbarItemAtom);
   const brushProps = useAtomValue(brushPropertiesAtom);
 
+  // YJS awareness 설정
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    // 해당 레이어의 브러쉬 인식 초기화
+    const { getOtherUsersDrawingLines, cleanup } = initBrushAwareness(layer.id);
+
+    let animationFrameId: number;
+    const updateFrame = () => {
+      const drawingLines = getOtherUsersDrawingLines();
+      setOtherUsersDrawingLines(drawingLines);
+      animationFrameId = requestAnimationFrame(updateFrame);
+    };
+
+    // 정리 함수
+    animationFrameId = requestAnimationFrame(updateFrame);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      cleanup!();
+    };
+  }, [layer.id, status]);
+
   // 레이어 데이터 초기화 및 복원
   useEffect(() => {
     if (status !== "authenticated") return;
+
     if (
       layer.layer_content?.normal_data &&
       typeof layer.layer_content.normal_data === "object"
@@ -67,16 +102,14 @@ const Brush: React.FC<BrushComponentProps> = ({
     }
   }, [layer.id, layer.layer_content, status]);
 
-  // Brush.tsx의 useEffect 부분 수정
-
-  // 이벤트 핸들러 설정 (수정된 코드)
+  // 이벤트 핸들러 설정
   useEffect(() => {
     const stage = stageRef.current;
     if (!stage) {
       return;
     }
 
-    // Brush.tsx 파일 내 handleMouseDown 함수 수정
+    // 마우스 다운 핸들러
     const handleMouseDown = (
       e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
     ) => {
@@ -110,8 +143,14 @@ const Brush: React.FC<BrushComponentProps> = ({
       };
 
       setCurrentLine(newLine);
+
+      // YJS awareness로 현재 그리기 상태 공유
+      if (user) {
+        updateDrawingAwareness(layer.id, newLine, user.user.id);
+      }
     };
 
+    // 마우스 이동 핸들러
     const handleMouseMove = (
       e: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
     ) => {
@@ -148,17 +187,26 @@ const Brush: React.FC<BrushComponentProps> = ({
       // 현재 라인에 포인트 추가
       const newPoints = [...currentLine.points, point.x, point.y];
 
-      setCurrentLine({
+      const updatedLine = {
         ...currentLine,
         points: newPoints,
-      });
+      };
+
+      setCurrentLine(updatedLine);
+
+      // YJS awareness로 현재 그리기 상태 공유
+      if (user) {
+        updateDrawingAwareness(layer.id, updatedLine, user.user.id);
+      }
     };
 
+    // 마우스 업 핸들러
     const handleMouseUp = () => {
       if (!isDrawingRef.current) return;
       completeDrawing();
     };
 
+    // 그리기 완료 처리
     const completeDrawing = () => {
       isDrawingRef.current = false;
 
@@ -166,6 +214,11 @@ const Brush: React.FC<BrushComponentProps> = ({
         // 점이 너무 적으면 드로잉 무시 (클릭만 했을 때)
         if (currentLine.points.length <= 2) {
           setCurrentLine(null);
+
+          // 그리기 인식 상태 초기화
+          if (user) {
+            updateDrawingAwareness(layer.id, null, user.user.id);
+          }
           return;
         }
 
@@ -173,6 +226,11 @@ const Brush: React.FC<BrushComponentProps> = ({
         const updatedLines = [...lines, currentLine];
         setLines(updatedLines);
         setCurrentLine(null);
+
+        // 그리기 인식 상태 초기화
+        if (user) {
+          updateDrawingAwareness(layer.id, null, user.user.id);
+        }
 
         if (!layer.layer_content) {
           return;
@@ -198,7 +256,7 @@ const Brush: React.FC<BrushComponentProps> = ({
       }
     };
 
-    //이벤트 리스너 등록
+    // 이벤트 리스너 등록
     if (
       (currentToolbarItem === ToolbarItemIDs.BRUSH ||
         currentToolbarItem === ToolbarItemIDs.ERASER) &&
@@ -226,6 +284,10 @@ const Brush: React.FC<BrushComponentProps> = ({
         stage.off("mousemove touchmove", handleMouseMove);
         stage.off("mouseup touchend", handleMouseUp);
       }
+
+      // 인식 상태 정리
+      cleanupDrawingAwareness();
+
       document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [
@@ -239,7 +301,9 @@ const Brush: React.FC<BrushComponentProps> = ({
     lines,
     currentLine,
     onUpdate,
+    user,
   ]);
+
   // visible이 false인 경우 렌더링하지 않음
   if (!layer.visible) return null;
 
@@ -284,6 +348,26 @@ const Brush: React.FC<BrushComponentProps> = ({
           }
         />
       )}
+
+      {/* 다른 사용자들이 그리는 중인 라인 (실시간) */}
+      {Object.values(otherUsersDrawingLines).map((line, i) => (
+        <Line
+          key={`temp-line-${i}`}
+          points={line.points}
+          stroke={line.stroke}
+          strokeWidth={line.strokeWidth}
+          tension={line.tension}
+          lineCap={line.lineCap}
+          lineJoin={line.lineJoin}
+          perfectDrawEnabled={false}
+          listening={false}
+          bezier={line.bezier}
+          strokeScaleEnabled={true}
+          globalCompositeOperation={
+            line.globalCompositeOperation || "source-over"
+          }
+        />
+      ))}
     </Group>
   );
 };
