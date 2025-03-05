@@ -20,7 +20,12 @@ export const initProjectSocket = async (project: string, session: Session) => {
   socketInitializing = true; // 초기화 시작 표시
 
   try {
-    socket = io(SOCKET_URL, {
+    // socket = io(SOCKET_URL, {
+    //   autoConnect: true,
+    //   reconnection: true,
+    //   transports: ["websocket"],
+    // });
+    socket = io({
       autoConnect: true,
       reconnection: true,
       transports: ["websocket"],

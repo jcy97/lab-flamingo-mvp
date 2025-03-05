@@ -15,7 +15,6 @@ import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import { Canvas as CanvasType, LayerContent } from "@prisma/mongodb-client";
 import Konva from "konva";
 import Brush from "./Layer/Brush";
-import { brushPropertiesAtom } from "~/store/atoms";
 import BrushCursor from "./Layer/BurshCurosr";
 import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
