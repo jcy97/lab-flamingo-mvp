@@ -21,7 +21,7 @@ app.prepare().then(() => {
   // Socket.io 서버 초기화
   const io = new Server(httpServer, {
     cors: {
-      origin: dev ? "ws://localhost:3000" : "your-production-domain.com", //TODO 도메인 추가 필요
+      origin: dev ? "http://localhost:3000" : "https://mvp.greatwave.co.kr",
       methods: ["GET", "POST"],
     },
   });
