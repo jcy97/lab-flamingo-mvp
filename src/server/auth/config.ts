@@ -73,6 +73,7 @@ export const authConfig = {
     strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60,
   },
+  trustHost: true,
   adapter: PrismaAdapter(db),
   callbacks: {
     async redirect({ url, baseUrl }) {
