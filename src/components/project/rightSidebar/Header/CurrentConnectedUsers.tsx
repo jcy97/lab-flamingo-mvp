@@ -4,7 +4,7 @@ import Status from "~/components/common/profile/Status";
 import { CurrentConnectedUser } from "~/types/types";
 
 interface CurrentConnectedUsersProps {
-  currentConnectedUsers: Array<CurrentConnectedUser> | undefined; // undefined 가능성 추가
+  currentConnectedUsers?: Array<CurrentConnectedUser> | undefined; // undefined 가능성 추가
   type: string;
 }
 

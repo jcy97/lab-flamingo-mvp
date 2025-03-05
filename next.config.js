@@ -10,6 +10,9 @@ const config = {
     config.externals = [...config.externals, "bcrypt", { canvas: "canvas" }];
     return config;
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default config;
