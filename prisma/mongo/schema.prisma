@@ -75,6 +75,7 @@ model LayerContent {
   position_x      Float    @default(0)
   position_y      Float    @default(0)
   rotation        Float    @default(0)
+  transform       Json     @default("{\"x\":0,\"y\":0,\"width\":100,\"height\":100,\"rotation\":0,\"scaleX\":1,\"scaleY\":1}")
   
   // Type-specific properties stored in JSON
   normal_data      Json?    // 일반 레이어 데이터 (브러쉬 등..)
