@@ -75,7 +75,10 @@ const ToolbarItem: React.FC<ToolbarItemProps> = ({
             : "hover:bg-neutral-800"
         }`}
       >
-        <button onClick={handleMainItemClick} className="flex items-center">
+        <button
+          onClick={handleMainItemClick}
+          className="flex items-center outline-none"
+        >
           <CurrentIcon className="h-5 w-5 text-neutral-100" />
         </button>
 
