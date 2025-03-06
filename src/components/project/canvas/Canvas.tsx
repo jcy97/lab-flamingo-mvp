@@ -521,7 +521,7 @@ const Canvas: React.FC = () => {
       return selectedLayers.map((layer) => {
         return {
           ...layer,
-          transform: layer.layer_content!.transform,
+          transform: layer.layer_content?.transform,
         } as TransformableLayer;
       });
     }
