@@ -166,8 +166,6 @@ export const observeCanvasChanges = () => {
 
     // canvasLayersAtom 업데이트 - 기존 레이어 정보 유지하면서 변경
     const canvasLayers = store.get(canvasLayersAtom);
-    console.log("체크");
-    console.log(canvasLayers);
     const updatedCanvasLayers = { ...canvasLayers };
 
     // 추가되거나 변경된 캔버스에 대해 레이어가 없는 경우에만 업데이트

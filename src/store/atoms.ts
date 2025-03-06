@@ -3,6 +3,7 @@ import { Project } from "~/schemas";
 import { Canvas, Page, Layer, LayerContent } from "@prisma/mongodb-client";
 import { CurrentConnectedUser } from "~/types/types";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
+import Konva from "konva";
 
 export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
@@ -60,6 +61,37 @@ export const currentLayersAtom = atom<LayerWithContents[]>([]);
 //현재 사용자가 선택한 레이어
 export const currentLayerAtom = atom<LayerWithContents>();
 
+// 다중 선택된 레이어 리스트
+export const selectedLayersAtom = atom<LayerWithContents[]>([]);
+
+// 레이어 ref 아톰
+export const layerRefsMapAtom = atom<Map<string, Konva.Node>>(new Map());
+
+// 레이어 ref를 추가하는 atom
+export const addLayerRefAtom = atom(
+  null,
+  (get, set, { layerId, node }: { layerId: string; node: Konva.Node }) => {
+    const currentMap = get(layerRefsMapAtom);
+    const newMap = new Map(currentMap);
+    newMap.set(layerId, node);
+    set(layerRefsMapAtom, newMap);
+  },
+);
+
+// 레이어 ref를 제거하는 atom
+export const removeLayerRefAtom = atom(null, (get, set, layerId: string) => {
+  const currentMap = get(layerRefsMapAtom);
+  const newMap = new Map(currentMap);
+  newMap.delete(layerId);
+  set(layerRefsMapAtom, newMap);
+});
+
+// 특정 레이어의 ref를 가져오는 atom
+export const getLayerRefAtom = atom((get) => (layerId: string) => {
+  const refsMap = get(layerRefsMapAtom);
+  return refsMap.get(layerId) || null;
+});
+
 //현재 프로젝트 접속 중인 사용자
 export const currentConnectedUserAtom = atom<CurrentConnectedUser[]>([]);
 
@@ -81,3 +113,6 @@ export const brushPropertiesAtom = atom({
   type: "round", // 브러시 유형 (round, square, texture)
   texture: null, // 텍스처 브러시용 이미지 URL
 });
+
+// 트랜스포머 표시 상태 관리
+export const showTransformerAtom = atom<boolean>(false);

@@ -1,4 +1,3 @@
-"use client";
 import { useRef, useEffect, useState } from "react";
 import { Line, Group } from "react-konva";
 import { Layer, LayerContent } from "@prisma/mongodb-client";
@@ -6,22 +5,20 @@ import {
   currentToolbarItemAtom,
   brushPropertiesAtom,
   currentLayerAtom,
+  LayerWithContents,
+  addLayerRefAtom,
+  removeLayerRefAtom,
 } from "~/store/atoms";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
-import { LineData } from "~/types/types";
+import { LineData, SizeInfo, Transform } from "~/types/types";
 import { useSession } from "next-auth/react";
 import {
   initBrushAwareness,
   updateDrawingAwareness,
   cleanupDrawingAwareness,
 } from "~/app/actions/yjs/brushYjs";
-
-// 레이어 컨텐츠
-export interface LayerWithContents extends Layer {
-  layer_content: LayerContent | null;
-}
 
 interface BrushComponentProps {
   layer: LayerWithContents;
@@ -33,6 +30,7 @@ interface BrushComponentProps {
   onUpdate?: (layerId: string, data: LayerContent) => void;
   isSpacePressed?: boolean;
   listening?: boolean;
+  onSizeChange?: (layerId: string, newSize: SizeInfo) => void;
 }
 
 const Brush: React.FC<BrushComponentProps> = ({
@@ -60,6 +58,67 @@ const Brush: React.FC<BrushComponentProps> = ({
 
   const currentToolbarItem = useAtomValue(currentToolbarItemAtom);
   const brushProps = useAtomValue(brushPropertiesAtom);
+
+  const groupRef = useRef<Konva.Group>(null);
+
+  // 그룹의 변환 정보를 저장
+  const [groupTransform, setGroupTransform] = useState<{
+    x: number;
+    y: number;
+    scaleX: number;
+    scaleY: number;
+    rotation: number;
+  }>({
+    x: 0,
+    y: 0,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+  });
+
+  // 레이어 ref 추가/제거 atom
+  const [, addLayerRef] = useAtom(addLayerRefAtom);
+  const [, removeLayerRef] = useAtom(removeLayerRefAtom);
+
+  // 컴포넌트 마운트/언마운트 시 ref 등록/해제
+  useEffect(() => {
+    if (groupRef.current) {
+      // ref 등록
+      addLayerRef({ layerId: layer.id, node: groupRef.current });
+    }
+
+    // 컴포넌트 언마운트 시 ref 해제
+    return () => {
+      removeLayerRef(layer.id);
+    };
+  }, [layer.id, addLayerRef, removeLayerRef]);
+
+  // layer.layer_content.transform 값 감지 및 그룹 변환 업데이트
+  useEffect(() => {
+    if (!layer.layer_content?.transform || !groupRef.current) return;
+
+    const transform = layer.layer_content.transform as unknown as Transform;
+    // 그룹 변환 업데이트
+    setGroupTransform({
+      x: transform.x || 0,
+      y: transform.y || 0,
+      scaleX: transform.scaleX || 1,
+      scaleY: transform.scaleY || 1,
+      rotation: transform.rotation || 0,
+    });
+
+    // 그룹 속성 직접 설정
+    if (groupRef.current) {
+      groupRef.current.x(transform.x || 0);
+      groupRef.current.y(transform.y || 0);
+      groupRef.current.scaleX(transform.scaleX || 1);
+      groupRef.current.scaleY(transform.scaleY || 1);
+      groupRef.current.rotation(transform.rotation || 0);
+
+      // 변경사항 적용
+      groupRef.current.getLayer()?.batchDraw();
+    }
+  }, [layer.layer_content?.transform]);
 
   // YJS awareness 설정
   useEffect(() => {
@@ -105,6 +164,28 @@ const Brush: React.FC<BrushComponentProps> = ({
     }
   }, [layer.id, layer.layer_content, status]);
 
+  // 그룹의 변환을 라인 포인트에 적용하는 함수
+  const applyGroupTransformToPoint = (x: number, y: number) => {
+    // 그룹 변환 역행렬을 계산하여 포인트를 그룹 로컬 좌표계로 변환
+    const rad = (groupTransform.rotation * Math.PI) / 180;
+    const cos = Math.cos(-rad);
+    const sin = Math.sin(-rad);
+
+    // 그룹 위치로 이동
+    let nx = x - groupTransform.x;
+    let ny = y - groupTransform.y;
+
+    // 회전 적용
+    const rx = nx * cos - ny * sin;
+    const ry = nx * sin + ny * cos;
+
+    // 스케일 적용
+    return {
+      x: rx / groupTransform.scaleX,
+      y: ry / groupTransform.scaleY,
+    };
+  };
+
   // 이벤트 핸들러 설정
   useEffect(() => {
     const stage = stageRef.current;
@@ -129,12 +210,15 @@ const Brush: React.FC<BrushComponentProps> = ({
       const transform = stage.getAbsoluteTransform().copy().invert();
       const point = transform.point(pos);
 
+      // 그룹 변환 적용
+      const transformedPoint = applyGroupTransformToPoint(point.x, point.y);
+
       // 지우개 모드인지 확인
       const isEraser = currentToolbarItem === ToolbarItemIDs.ERASER;
 
       // 새 라인 생성
       const newLine: LineData = {
-        points: [point.x, point.y],
+        points: [transformedPoint.x, transformedPoint.y],
         stroke: isEraser ? "#000000" : brushProps.color,
         strokeWidth: brushProps.size,
         tension: brushProps.smoothing * 0.5,
@@ -173,14 +257,17 @@ const Brush: React.FC<BrushComponentProps> = ({
       const transform = stage.getAbsoluteTransform().copy().invert();
       const point = transform.point(pos);
 
+      // 그룹 변환 적용
+      const transformedPoint = applyGroupTransformToPoint(point.x, point.y);
+
       // 같은 위치에 점을 계속 추가하는 것을 방지 (성능 개선)
       const lastX = currentLine.points[currentLine.points.length - 2];
       const lastY = currentLine.points[currentLine.points.length - 1];
 
       // 마지막 점과 현재 점 사이의 거리가 너무 작으면 점 추가하지 않음
       const minDistance = 1; // 최소 거리 설정 (픽셀 단위)
-      const dx = point.x - lastX!;
-      const dy = point.y - lastY!;
+      const dx = transformedPoint.x - lastX!;
+      const dy = transformedPoint.y - lastY!;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance < minDistance) {
@@ -188,7 +275,11 @@ const Brush: React.FC<BrushComponentProps> = ({
       }
 
       // 현재 라인에 포인트 추가
-      const newPoints = [...currentLine.points, point.x, point.y];
+      const newPoints = [
+        ...currentLine.points,
+        transformedPoint.x,
+        transformedPoint.y,
+      ];
 
       const updatedLine = {
         ...currentLine,
@@ -243,11 +334,12 @@ const Brush: React.FC<BrushComponentProps> = ({
           const updatedLayerContent = {
             id: layer.layer_content.id,
             layer_id: layer.layer_content.layer_id,
+            transform: groupTransform,
             position_x: layer.layer_content.position_x,
             position_y: layer.layer_content.position_y,
             rotation: layer.layer_content.rotation,
             normal_data: {
-              lines: updatedLines, // 업데이트된 라인으로 교체
+              lines: updatedLines,
             } as Record<string, any>,
             shape_data: layer.layer_content.shape_data,
             text_data: layer.layer_content.text_data,
@@ -305,13 +397,14 @@ const Brush: React.FC<BrushComponentProps> = ({
     currentLine,
     onUpdate,
     user,
+    groupTransform,
   ]);
 
   // visible이 false인 경우 렌더링하지 않음
   if (!layer.visible) return null;
 
   return (
-    <Group>
+    <Group ref={groupRef} id={layer.id}>
       {/* 저장된 모든 라인 렌더링 */}
       {lines.map((line, i) => (
         <Line
@@ -325,7 +418,6 @@ const Brush: React.FC<BrushComponentProps> = ({
           opacity={line.opacity}
           bezier={line.bezier}
           perfectDrawEnabled={false}
-          listening={false}
           globalCompositeOperation={
             line.globalCompositeOperation || "source-over"
           }

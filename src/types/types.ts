@@ -1,5 +1,6 @@
 import { Session } from "next-auth";
 import { IconType } from "react-icons";
+import { LayerWithContents } from "~/store/atoms";
 
 export interface SubToolbarItem {
   id: string;
@@ -63,4 +64,40 @@ export interface LineData {
 export interface RealtimeBrushState {
   userId: string;
   currentLine: LineData | null;
+}
+
+// 변환 가능한 레이어 타입 정의 (Konva 객체가 필요한 정보들)
+export interface TransformableLayer extends LayerWithContents {
+  // 레이어의 변환 정보
+  transform?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    scaleX: number;
+    scaleY: number;
+  };
+}
+
+// 객체 크기 정보 인터페이스
+export interface SizeInfo {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scaleX?: number;
+  scaleY?: number;
+}
+
+// Transform 객체 인터페이스 정의
+export interface Transform {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
 }

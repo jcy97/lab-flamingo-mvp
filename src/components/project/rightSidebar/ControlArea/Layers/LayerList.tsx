@@ -3,11 +3,15 @@ import { useEffect, useState, useRef } from "react";
 import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 import { HiOutlineAdjustments } from "react-icons/hi";
 import { BiRename, BiTrash } from "react-icons/bi";
+import { MdOutlinePhotoSizeSelectLarge } from "react-icons/md";
 import { useAtom, useAtomValue } from "jotai";
 import {
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
+  LayerWithContents,
+  selectedLayersAtom,
+  showTransformerAtom,
 } from "~/store/atoms";
 import {
   deleteLayer,
@@ -21,6 +25,8 @@ const LayerList: React.FC = () => {
   const { data: session } = useSession();
   const [layers, setLayers] = useAtom(currentLayersAtom);
   const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
+  const [selectedLayers, setSelectedLayers] = useAtom(selectedLayersAtom);
+  const [showTransformer, setShowTransformer] = useAtom(showTransformerAtom);
   const currentCanvas = useAtomValue(currentCanvasAtom);
   const [draggedItem, setDraggedItem] = useState<number | null>(null);
   const [dragOverItem, setDragOverItem] = useState<number | null>(null);
@@ -45,11 +51,22 @@ const LayerList: React.FC = () => {
       }
     };
 
+    // 다중 선택 해제를 위한 이벤트 리스너 (캔버스 영역 클릭 시)
+    const handleDocumentClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // 레이어 리스트 영역 밖을 클릭했을 때 다중 선택 해제
+      if (!target.closest(".layer-list-container")) {
+        setSelectedLayers([]);
+      }
+    };
+
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("click", handleDocumentClick);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("click", handleDocumentClick);
     };
-  }, []);
+  }, [setSelectedLayers]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
@@ -102,7 +119,7 @@ const LayerList: React.FC = () => {
     layerId: string,
     isVisible: boolean,
   ) => {
-    e.stopPropagation(); // 레이어 선택 이벤트 방지
+    e.stopPropagation();
     if (currentCanvas && session) {
       toggleLayerVisibility(currentCanvas.id, layerId, isVisible, session);
     }
@@ -110,7 +127,7 @@ const LayerList: React.FC = () => {
 
   // 설정 메뉴 토글
   const toggleMenu = (e: React.MouseEvent, layerId: string) => {
-    e.stopPropagation(); // 레이어 선택 이벤트 방지
+    e.stopPropagation();
     setMenuOpen(menuOpen === layerId ? null : layerId);
   };
 
@@ -141,6 +158,58 @@ const LayerList: React.FC = () => {
     }
   };
 
+  // 크기 조정 처리 (새로 추가된 함수)
+  const handleResizeClick = (e: React.MouseEvent, layer: LayerWithContents) => {
+    e.stopPropagation();
+    // 현재 레이어로 설정
+    setCurrentLayer(layer);
+    // 트랜스포머 표시
+    setShowTransformer(true);
+    // 메뉴 닫기
+    setMenuOpen(null);
+  };
+
+  // 레이어 선택 처리 (다중 선택 기능 추가)
+  const handleLayerSelect = (e: React.MouseEvent, layer: LayerWithContents) => {
+    // Command(Mac) 또는 Control(Windows) 키가 눌려있는지 확인
+    const isMultiSelectKeyPressed = e.metaKey || e.ctrlKey;
+
+    if (isMultiSelectKeyPressed) {
+      // 이미 선택된 레이어인지 확인
+      const isAlreadySelected = selectedLayers.some(
+        (selected) => selected.id === layer.id,
+      );
+
+      if (isAlreadySelected) {
+        // 이미 선택된 레이어면 선택 해제 (제거)
+        setSelectedLayers(
+          selectedLayers.filter((selected) => selected.id !== layer.id),
+        );
+      } else {
+        // 선택되지 않은 레이어면 다중 선택 목록에 추가
+        setSelectedLayers([...selectedLayers, layer]);
+      }
+
+      // 현재 레이어로도 설정 (편집 작업을 위해)
+      setCurrentLayer(layer);
+    } else {
+      // 일반 클릭 시 다중 선택 해제하고 현재 레이어만 선택
+      setSelectedLayers([layer]);
+      setCurrentLayer(layer);
+    }
+  };
+
+  // 레이어가 선택되었는지 확인하는 함수
+  const isLayerSelected = (layerId: string) => {
+    // 다중 선택이 있는 경우 selectedLayers
+    // 배열에서 확인
+    if (selectedLayers.length > 0) {
+      return selectedLayers.some((layer) => layer.id === layerId);
+    }
+    // 다중 선택이 없는 경우 currentLayer와 비교
+    return currentLayer?.id === layerId;
+  };
+
   if (!layers || layers.length === 0 || !currentCanvas || !currentLayer) {
     return (
       <div className="flex h-full w-full items-center justify-center text-neutral-400">
@@ -150,7 +219,7 @@ const LayerList: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-1 overflow-y-auto">
+    <div className="layer-list-container flex h-full w-full flex-col gap-1 overflow-y-auto">
       {layers
         .sort((a, b) => b.index - a.index)
         .map((layer, index) => (
@@ -160,7 +229,7 @@ const LayerList: React.FC = () => {
             onDragStart={(e) => handleDragStart(e, index)}
             onDragOver={(e) => handleDragOver(e, index)}
             onDragEnd={handleDragEnd}
-            onClick={() => setCurrentLayer(layer)}
+            onClick={(e) => handleLayerSelect(e, layer)}
             className={`flex h-[55px] w-full items-center justify-between rounded-lg transition-all duration-150 hover:cursor-pointer ${
               draggedItem === index
                 ? "opacity-50"
@@ -168,7 +237,7 @@ const LayerList: React.FC = () => {
                   ? "border-2 border-primary-500"
                   : ""
             } ${
-              currentLayer.id === layer.id
+              isLayerSelected(layer.id)
                 ? "bg-neutral-500"
                 : "bg-neutral-800 hover:bg-neutral-700"
             }`}
@@ -245,6 +314,14 @@ const LayerList: React.FC = () => {
                     >
                       <BiRename size={16} />
                       <span>이름 변경</span>
+                    </button>
+                    {/* 크기 조정 옵션 추가 */}
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) => handleResizeClick(e, layer)}
+                    >
+                      <MdOutlinePhotoSizeSelectLarge size={16} />
+                      <span>크기 조정</span>
                     </button>
                     <button
                       className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"

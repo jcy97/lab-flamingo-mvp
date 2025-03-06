@@ -8,40 +8,25 @@ import {
   currentLayersAtom,
   currentLayerAtom,
   canvasSelectedLayerMapAtom,
-  LayerWithContents,
+  selectedLayersAtom, // 다중 선택 레이어 atom
+  showTransformerAtom,
+  LayerWithContents, // 트랜스포머 표시 상태 atom
 } from "~/store/atoms";
-import { Stage, Layer } from "react-konva";
+import { Stage, Layer, Rect } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import { Canvas as CanvasType, LayerContent } from "@prisma/mongodb-client";
 import Konva from "konva";
-import Brush from "./Layer/Brush";
+import Brush from "./Layer/Brush"; // 수정된 Brush 컴포넌트
 import BrushCursor from "./Layer/BurshCurosr";
+import LayerTransformer from "./Layer/LayerTransformer"; // 새로 만든 트랜스포머 컴포넌트
 import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 import UserMousePointers from "~/components/common/user/UserMousePointers";
+import { SizeInfo, Transform, TransformableLayer } from "~/types/types";
 
 // Define Canvas with Layers type
 export interface CanvasWithLayers extends CanvasType {
   canvas_layers: LayerWithContents[];
-}
-
-// 레이어 업데이트 인터페이스 수정 (lines 배열로 변경)
-interface LayerUpdatePayload {
-  layerId: string;
-  normalData: {
-    lines: LineData[];
-  };
-}
-
-// LineData 인터페이스 추가
-interface LineData {
-  points: number[];
-  stroke: string;
-  strokeWidth: number;
-  tension: number;
-  lineCap: "round" | "square";
-  lineJoin: "round" | "miter";
-  opacity: number;
 }
 
 // 최소 및 최대 스케일 값 정의
@@ -60,6 +45,8 @@ const Canvas: React.FC = () => {
     | undefined;
   const currentLayers = useAtomValue(currentLayersAtom) as LayerWithContents[];
   const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
+  const [selectedLayers, setSelectedLayers] = useAtom(selectedLayersAtom);
+  const [showTransformer, setShowTransformer] = useAtom(showTransformerAtom);
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [currentToolbarItem, setCurrentToolbarItem] = useAtom(
     currentToolbarItemAtom,
@@ -93,6 +80,42 @@ const Canvas: React.FC = () => {
   // Stage와 컨테이너에 대한 참조
   const stageRef = useRef<Konva.Stage | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // 트랜스포머 관련 상태
+  const transformerRef = useRef<Konva.Transformer | null>(null);
+  const [isClickInsideTransformer, setIsClickInsideTransformer] =
+    useState<boolean>(false);
+
+  // 레이어 크기 및 위치 정보 캐싱
+  const [layerSizeInfo, setLayerSizeInfo] = useState<Record<string, SizeInfo>>(
+    {},
+  );
+
+  // 노드 드래그 관련 상태
+  const [isNodeDragging, setIsNodeDragging] = useState<boolean>(false);
+
+  // 노드 드래그 이벤트 감지
+  useEffect(() => {
+    if (stageRef.current) {
+      const container = stageRef.current.container();
+
+      const handleNodeDragStart = () => {
+        setIsNodeDragging(true);
+      };
+
+      const handleNodeDragEnd = () => {
+        setIsNodeDragging(false);
+      };
+
+      container.addEventListener("nodeDragStart", handleNodeDragStart);
+      container.addEventListener("nodeDragEnd", handleNodeDragEnd);
+
+      return () => {
+        container.removeEventListener("nodeDragStart", handleNodeDragStart);
+        container.removeEventListener("nodeDragEnd", handleNodeDragEnd);
+      };
+    }
+  }, [stageRef.current]);
 
   // 윈도우 크기에 맞게 초기 스케일 조정하는 함수
   const adjustInitialScale = (): void => {
@@ -145,12 +168,109 @@ const Canvas: React.FC = () => {
         }
         return layer;
       });
-
-      // 필요한 경우 레이어 상태 업데이트 로직 추가
     }
 
     // 서버에 데이터 저장
     saveLayerContent(currentCanvas!.id, layerId, data, user!);
+  };
+
+  // 레이어 크기 변경 핸들러
+  const handleLayerSizeChange = (layerId: string, newSize: SizeInfo) => {
+    // 크기 정보 캐싱
+    setLayerSizeInfo((prev) => ({
+      ...prev,
+      [layerId]: newSize,
+    }));
+
+    // 현재 선택된 레이어 찾기
+    const layer = currentLayers.find((l) => l.id === layerId);
+    if (!layer || !layer.layer_content) return;
+
+    // 레이어 콘텐츠 업데이트
+    const updatedContent = {
+      ...layer.layer_content,
+      transform: {
+        x: newSize.x,
+        y: newSize.y,
+        rotation: newSize.rotation,
+        scaleX: newSize.scaleX,
+        scaleY: newSize.scaleY,
+      },
+    };
+
+    handleLayerUpdate(layerId, updatedContent);
+  };
+
+  const keepMultiLayerSelect = (layers: TransformableLayer[]) => {
+    setTimeout(() => {
+      if (layers.length > 0) {
+        // 선택된 레이어 유지
+        setSelectedLayers([...layers]);
+
+        // 트랜스포머 표시 상태 유지
+        setShowTransformer(true);
+
+        // 트랜스포머 업데이트
+        if (transformerRef.current) {
+          const nodesToAttach: Konva.Node[] = [];
+
+          // 선택된 레이어의 노드들 찾기
+          layers.forEach((layer) => {
+            const node = stageRef.current?.findOne(`#${layer.id}`);
+            if (node) {
+              nodesToAttach.push(node);
+            }
+          });
+
+          // 트랜스포머에 노드 다시 연결
+          if (nodesToAttach.length > 0) {
+            transformerRef.current.nodes(nodesToAttach);
+            transformerRef.current.getLayer()?.batchDraw();
+          }
+        }
+      }
+    }, 10);
+  };
+
+  // 트랜스포머 토글 함수
+  const toggleTransformer = () => {
+    setShowTransformer(!showTransformer);
+  };
+
+  // 트랜스포머 끄기 함수
+  const hideTransformer = () => {
+    if (showTransformer) {
+      setShowTransformer(false);
+    }
+  };
+
+  // 클릭이 트랜스포머 내부인지 확인하는 함수
+  const checkIfClickInsideTransformer = (
+    e: React.MouseEvent<HTMLDivElement>,
+  ) => {
+    if (!showTransformer || !stageRef.current || !transformerRef.current) {
+      return false;
+    }
+
+    // 클릭 좌표를 스테이지 좌표로 변환
+    const stage = stageRef.current;
+    const point = stage.getPointerPosition();
+
+    if (!point) return false;
+
+    // 트랜스포머의 경계 가져오기
+    const transformer = transformerRef.current;
+    const boundingBox = transformer.getClientRect();
+
+    // 클릭 좌표가 경계 내부인지 확인
+    const isInside =
+      point.x >= boundingBox.x &&
+      point.x <= boundingBox.x + boundingBox.width &&
+      point.y >= boundingBox.y &&
+      point.y <= boundingBox.y + boundingBox.height;
+
+    setIsClickInsideTransformer(isInside);
+    return isInside;
   };
 
   // 클릭 이벤트 핸들러
@@ -167,6 +287,18 @@ const Canvas: React.FC = () => {
       // 새 스케일 계산 (20% 감소)
       changeScale(scaleFactor * ZOOM_OUT_FACTOR);
       return;
+    }
+
+    // 트랜스포머 활성화 상태에서 바깥 영역 클릭 처리
+    if (showTransformer) {
+      // 클릭이 트랜스포머 내부인지 확인
+      const isInside = checkIfClickInsideTransformer(e);
+
+      // 트랜스포머 바깥쪽 클릭 시 트랜스포머 숨기기
+      if (!isInside) {
+        hideTransformer();
+        return;
+      }
     }
 
     // 기존 줌 툴바 기능
@@ -234,18 +366,19 @@ const Canvas: React.FC = () => {
 
   // 마우스 이동 이벤트 핸들러 - 드래그 중
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
-    if (!isDragging) return;
+    if (isNodeDragging) return;
+    if (isDragging) {
+      const newPosition = {
+        x: position.x + (e.clientX - lastPointerPosition.x),
+        y: position.y + (e.clientY - lastPointerPosition.y),
+      };
 
-    const newPosition = {
-      x: position.x + (e.clientX - lastPointerPosition.x),
-      y: position.y + (e.clientY - lastPointerPosition.y),
-    };
-
-    setPosition(newPosition);
-    setLastPointerPosition({
-      x: e.clientX,
-      y: e.clientY,
-    });
+      setPosition(newPosition);
+      setLastPointerPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+    }
   };
 
   // 마우스 업 이벤트 핸들러 - 드래그 종료
@@ -266,6 +399,21 @@ const Canvas: React.FC = () => {
     const handleKeyDown = (e: KeyboardEvent): void => {
       // 키 상태 업데이트
       activeKeys[e.code] = true;
+
+      // Ctrl + T 키 감지하여 트랜스포머 토글
+      if (e.ctrlKey && e.code === "KeyT") {
+        e.preventDefault(); // 기본 동작 방지
+        e.stopPropagation(); // 버블링 방지
+        toggleTransformer();
+        return;
+      }
+
+      // 트랜스포머 활성화 상태에서 Enter나 Esc 키 처리
+      if (showTransformer && (e.code === "Enter" || e.code === "Escape")) {
+        e.preventDefault();
+        hideTransformer();
+        return;
+      }
 
       // 스페이스 키 처리
       if (e.code === "Space" && !e.repeat) {
@@ -335,7 +483,7 @@ const Canvas: React.FC = () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, []);
+  }, [showTransformer]);
 
   // 컴포넌트 마운트 시 초기화
   useEffect(() => {
@@ -363,6 +511,33 @@ const Canvas: React.FC = () => {
     (currentCanvas && canvasSelectedLayerMap[currentCanvas.id]);
 
   const isTransparent = currentCanvas.background === "TRANSPARENT";
+
+  // 트랜스포머에 표시할 레이어들 준비
+  const getTransformableLayers = (): TransformableLayer[] => {
+    if (!showTransformer) return [];
+
+    // 다중 선택된 레이어가 있으면 해당 레이어들 반환
+    if (selectedLayers.length > 0) {
+      return selectedLayers.map((layer) => {
+        return {
+          ...layer,
+          transform: layer.layer_content?.transform,
+        } as TransformableLayer;
+      });
+    }
+
+    // 다중 선택된 레이어가 없고 현재 레이어가 있으면 현재 레이어만 반환
+    if (currentLayer) {
+      return [
+        {
+          ...currentLayer,
+          transform: currentLayer.layer_content?.transform,
+        } as TransformableLayer,
+      ];
+    }
+
+    return [];
+  };
 
   // 마우스 커서 스타일 결정
   const getCursorStyle = (): string => {
@@ -466,13 +641,30 @@ const Canvas: React.FC = () => {
                           onUpdate={handleLayerUpdate}
                           stageRef={stageRef}
                           isSpacePressed={isSpacePressed}
-                          listening={layer.id === selectedLayerId}
+                          listening={
+                            layer.id === selectedLayerId ||
+                            selectedLayers.some((l) => l.id === layer.id)
+                          }
+                          onSizeChange={handleLayerSizeChange}
                         />
                       </Layer>
                     );
                   }
                   return null;
                 })}
+
+            {/* 트랜스포머 레이어 (모든 레이어 위에 렌더링) */}
+            {showTransformer && (
+              <Layer>
+                <LayerTransformer
+                  ref={transformerRef}
+                  selectedLayers={getTransformableLayers()}
+                  onTransformEnd={handleLayerSizeChange}
+                  stageRef={stageRef}
+                  onKeepMultiLayerSelect={keepMultiLayerSelect}
+                />
+              </Layer>
+            )}
           </Stage>
         </div>
       </div>

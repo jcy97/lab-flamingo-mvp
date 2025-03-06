@@ -10,6 +10,7 @@ import {
   currentLayersAtom,
   currentPageAtom,
   canvasSelectedLayerMapAtom,
+  selectedLayersAtom,
 } from "~/store/atoms";
 import { useSession } from "next-auth/react";
 import {
@@ -29,6 +30,7 @@ const CanvasList: React.FC = () => {
   const setCurrentLayers = useSetAtom(currentLayersAtom);
   const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
   const canvasLayers = useAtomValue(canvasLayersAtom);
+  const setSelectedLayers = useSetAtom(selectedLayersAtom);
   const [canvasSelectedLayerMap, setCanvasSelectedLayerMap] = useAtom(
     canvasSelectedLayerMapAtom,
   );
@@ -50,6 +52,7 @@ const CanvasList: React.FC = () => {
       // 현재 캔버스의 레이어 목록 설정 - 항상 최신 상태를 사용
       const layers = canvasLayers[currentCanvas.id] || [];
       setCurrentLayers(layers);
+      setSelectedLayers([]);
 
       // 이미 선택된 레이어가 있고 해당 레이어가 현재 캔버스의 레이어 중 하나인지 확인
       if (
