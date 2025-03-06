@@ -1,13 +1,17 @@
 import AddButton from "~/components/common/button/AddButton";
 import { useSetAtom, useAtomValue } from "jotai";
-import { pageCanvasInformationAtom, currentPageAtom } from "~/store/atoms";
+import {
+  pageCanvasInformationAtom,
+  currentPageAtom,
+  pagesAtom,
+} from "~/store/atoms";
 import { addPage, getYPagesMap } from "~/app/actions/yjs/pageYjs";
 import { useSession } from "next-auth/react";
 import { PageWithCanvases } from "~/store/atoms";
 
 const PageHeader: React.FC = () => {
   const setSelectedPage = useSetAtom(currentPageAtom);
-  const pages = useAtomValue(pageCanvasInformationAtom);
+  const pages = useAtomValue(pagesAtom);
   const { data: session } = useSession();
 
   const handleAddPage = () => {

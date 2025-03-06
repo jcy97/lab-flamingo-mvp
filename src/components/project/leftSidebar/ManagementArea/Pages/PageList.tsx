@@ -38,31 +38,34 @@ const PageList: React.FC = () => {
   useEffect(() => {
     if (currentPage) {
       // 현재 페이지의 캔버스 목록 설정
-      setCurrentCanvases(pageCanvases[currentPage.id]!);
-      initCanvasesMap(pageCanvases[currentPage.id]!);
+      const canvases = pageCanvases[currentPage.id] || [];
+      if (canvases.length > 0) {
+        setCurrentCanvases(pageCanvases[currentPage.id] ?? []);
+        initCanvasesMap(canvases);
 
-      // 이전에 이 페이지에서 선택한 캔버스가 있는지 확인
-      const previouslySelectedCanvasId = currentCanvasMap[currentPage.id];
+        // 이전에 이 페이지에서 선택한 캔버스가 있는지 확인
+        const previouslySelectedCanvasId = currentCanvasMap[currentPage.id];
 
-      if (previouslySelectedCanvasId) {
-        // 이전에 선택한 캔버스를 찾아 설정
-        const previousCanvas = pageCanvases[currentPage.id]!.find(
-          (canvas) => canvas.id === previouslySelectedCanvasId,
-        );
+        if (previouslySelectedCanvasId) {
+          // 이전에 선택한 캔버스를 찾아 설정
+          const previousCanvas = pageCanvases[currentPage.id]!.find(
+            (canvas) => canvas.id === previouslySelectedCanvasId,
+          );
 
-        if (previousCanvas) {
-          setCurrentCanvas(previousCanvas);
+          if (previousCanvas) {
+            setCurrentCanvas(previousCanvas);
+          } else {
+            // 이전 캔버스를 찾을 수 없는 경우 (삭제되었을 수 있음)
+            // 첫 번째 캔버스를 기본값으로 설정
+            if (pageCanvases[currentPage.id]!.length > 0) {
+              setCurrentCanvas(pageCanvases[currentPage.id]![0]);
+            }
+          }
         } else {
-          // 이전 캔버스를 찾을 수 없는 경우 (삭제되었을 수 있음)
-          // 첫 번째 캔버스를 기본값으로 설정
+          // 이전에 선택한 캔버스가 없는 경우 첫 번째 캔버스를 기본값으로 설정
           if (pageCanvases[currentPage.id]!.length > 0) {
             setCurrentCanvas(pageCanvases[currentPage.id]![0]);
           }
-        }
-      } else {
-        // 이전에 선택한 캔버스가 없는 경우 첫 번째 캔버스를 기본값으로 설정
-        if (pageCanvases[currentPage.id]!.length > 0) {
-          setCurrentCanvas(pageCanvases[currentPage.id]![0]);
         }
       }
     }
