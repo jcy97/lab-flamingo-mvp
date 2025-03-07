@@ -98,18 +98,14 @@ const Canvas: React.FC = () => {
   useEffect(() => {
     if (stageRef.current) {
       const container = stageRef.current.container();
-
       const handleNodeDragStart = () => {
         setIsNodeDragging(true);
       };
-
       const handleNodeDragEnd = () => {
         setIsNodeDragging(false);
       };
-
       container.addEventListener("nodeDragStart", handleNodeDragStart);
       container.addEventListener("nodeDragEnd", handleNodeDragEnd);
-
       return () => {
         container.removeEventListener("nodeDragStart", handleNodeDragStart);
         container.removeEventListener("nodeDragEnd", handleNodeDragEnd);
@@ -143,8 +139,15 @@ const Canvas: React.FC = () => {
       setScaleFactor(1);
     }
 
-    // 초기 위치도 중앙으로 설정
-    setPosition({ x: 0, y: 0 });
+    // 초기 위치를 설정 - 부모 컨테이너 내에서 중앙 정렬
+    const initialX = (containerWidth - currentCanvas.width * newScale) / 2;
+    const initialY = (containerHeight - currentCanvas.height * newScale) / 2;
+
+    // 경계 조건 없이 중앙에 위치
+    setPosition({
+      x: initialX,
+      y: initialY,
+    });
   };
 
   // 스케일 변경 함수 - 모든 줌 작업에 사용
@@ -241,6 +244,26 @@ const Canvas: React.FC = () => {
   const hideTransformer = () => {
     if (showTransformer) {
       setShowTransformer(false);
+
+      // 트랜스포머 비활성화 시 모든 노드의 이벤트 리스너 제거
+      if (stageRef.current) {
+        // 모든 선택된 레이어 노드에서 이벤트 리스너 제거
+        selectedLayers.forEach((layer) => {
+          const node = stageRef.current?.findOne(`#${layer.id}`);
+          if (node) {
+            node.draggable(false);
+            node.off("dragstart");
+            node.off("dragend");
+            node.off("dragmove");
+          }
+        });
+
+        // 스테이지 리드로우
+        stageRef.current.batchDraw();
+      }
+
+      // 선택 레이어 초기화
+      setSelectedLayers([]);
     }
   };
 
@@ -343,12 +366,15 @@ const Canvas: React.FC = () => {
       MAX_SCALE,
     );
 
-    // 스케일 변경
+    // 스케일 변경 - 경계 제약 없음
     setScaleFactor(newScale);
   };
 
   // 마우스 다운 이벤트 핸들러 - 드래그 시작
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>): void => {
+    if (showTransformer) {
+      return;
+    }
     // 임시 확대/축소 모드일 경우 드래그 방지
     if (temporaryZoomIn || temporaryZoomOut) {
       return;
@@ -366,21 +392,36 @@ const Canvas: React.FC = () => {
 
   // 마우스 이동 이벤트 핸들러 - 드래그 중
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
-    if (isNodeDragging) return;
-    if (isDragging) {
-      const newPosition = {
-        x: position.x + (e.clientX - lastPointerPosition.x),
-        y: position.y + (e.clientY - lastPointerPosition.y),
-      };
+    if (!isDragging) return;
 
-      setPosition(newPosition);
-      setLastPointerPosition({
-        x: e.clientX,
-        y: e.clientY,
-      });
+    let newX = position.x + (e.clientX - lastPointerPosition.x);
+    let newY = position.y + (e.clientY - lastPointerPosition.y);
+
+    const parentX = containerRef.current?.clientWidth ?? 0;
+    const parentY = containerRef.current?.clientHeight ?? 0;
+
+    if (newX > parentX / 2) {
+      newX = parentX / 2;
     }
-  };
+    if (newX < -parentX / 2) {
+      newX = -parentX / 2;
+    }
+    if (newY > parentY / 2) {
+      newY = parentY / 2;
+    }
+    if (newY < -parentY / 2) {
+      newY = -parentY / 2;
+    }
+    setPosition({
+      x: newX,
+      y: newY,
+    });
 
+    setLastPointerPosition({
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
   // 마우스 업 이벤트 핸들러 - 드래그 종료
   const handleMouseUp = (): void => {
     setIsDragging(false);
@@ -417,6 +458,8 @@ const Canvas: React.FC = () => {
 
       // 스페이스 키 처리
       if (e.code === "Space" && !e.repeat) {
+        e.preventDefault();
+        e.stopPropagation();
         setIsSpacePressed(true);
       }
       // B 키를 눌렀을 때 브러시 도구 선택
@@ -435,14 +478,15 @@ const Canvas: React.FC = () => {
       // Windows: Ctrl+Space, macOS: 스포트라이트 충돌 방지를 위해 Ctrl+Space로 통일
       // 임시 확대 모드 활성화
       if (e.ctrlKey && e.code === "Space") {
-        e.preventDefault(); // 기본 브라우저 동작 방지
+        e.preventDefault();
+        e.stopPropagation();
         setTemporaryZoomIn(true);
         setTemporaryZoomOut(false);
       }
 
       // Windows/macOS 모두: Alt/Option + Space: 임시 축소 모드 활성화
       if (e.altKey && e.code === "Space") {
-        e.preventDefault(); // 기본 브라우저 동작 방지
+        e.preventDefault();
         setTemporaryZoomOut(true);
         setTemporaryZoomIn(false);
       }
@@ -562,7 +606,6 @@ const Canvas: React.FC = () => {
       ref={containerRef}
       className="relative flex h-full w-full items-center justify-center"
       style={{
-        overflow: "hidden",
         minHeight: "100%",
         minWidth: "100%",
         cursor: isSpacePressed
