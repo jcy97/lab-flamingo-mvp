@@ -139,15 +139,8 @@ const Canvas: React.FC = () => {
       setScaleFactor(1);
     }
 
-    // 초기 위치를 설정 - 부모 컨테이너 내에서 중앙 정렬
-    const initialX = (containerWidth - currentCanvas.width * newScale) / 2;
-    const initialY = (containerHeight - currentCanvas.height * newScale) / 2;
-
-    // 경계 조건 없이 중앙에 위치
-    setPosition({
-      x: initialX,
-      y: initialY,
-    });
+    // 초기 위치도 중앙으로 설정
+    setPosition({ x: 0, y: 0 });
   };
 
   // 스케일 변경 함수 - 모든 줌 작업에 사용
