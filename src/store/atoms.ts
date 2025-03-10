@@ -107,7 +107,7 @@ export const brushPropertiesAtom = atom({
   color: "#000000", // 브러시 색상
   size: 5, // 브러시 크기 (픽셀)
   opacity: 1, // 브러시 불투명도 (0~1)
-  smoothing: 0.5, // 브러시 부드러움 (0~1)
+  smoothing: 0.2, // 브러시 부드러움 (0~1)
   pressure: true, // 압력 감지 활성화 여부
   blendMode: "normal", // 브러시 혼합 모드
   type: "round", // 브러시 유형 (round, square, texture)

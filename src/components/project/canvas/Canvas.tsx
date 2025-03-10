@@ -385,7 +385,6 @@ const Canvas: React.FC = () => {
 
   // 마우스 이동 이벤트 핸들러 - 드래그 중
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>): void => {
-    console.log("dragging");
     if (!isDragging) return;
 
     let newX = position.x + (e.clientX - lastPointerPosition.x);

@@ -157,17 +157,58 @@ export const observeCanvasChanges = () => {
   const canvasesMap = ydoc.getMap<CanvasWithLayers>("canvasesMap");
 
   canvasesMap.observe((event) => {
-    console.log("캔버스 변경 감지!");
-
     // 변경된 모든 캔버스 가져오기
     const updatedCanvases = Array.from(canvasesMap.values()).sort(
       (a, b) => a.index - b.index,
     );
+    console.log("수근수근");
+    // 새로 추가된 캔버스에 대한 레이어 맵 초기화 및 레이어 변경 감지 설정
+    event.keysChanged.forEach((canvasId) => {
+      // keys는 String 타입이므로 적절히 형변환
+      const canvasIdStr = canvasId.toString();
+      const canvas = canvasesMap.get(canvasIdStr);
+      // 새로 추가된 캔버스인 경우 (이전에 없었던 경우)
+      event.keysChanged.forEach((canvasId) => {
+        // keys는 String 타입이므로 적절히 형변환
+        const canvasIdStr = canvasId.toString();
+        const canvas = canvasesMap.get(canvasIdStr);
+
+        // 새로 추가된 캔버스가 있을 경우
+        if (canvas) {
+          // 기존 레이어 관찰자가 없는지 확인을 위한 플래그 변수 (코드 내에서 관리)
+          // 이미 관찰 중인 캔버스에 대한 임시 집합을 활용할 수도 있습니다
+          const layerObserverKey = `layer_observer_${canvasIdStr}`;
+
+          // YDoc에 관찰자 상태를 저장할 수 있는 맵이 없으므로
+          // 여기서는 매번 레이어 맵 관찰을 설정하는 방식으로 수정
+          // 이미 관찰 중이어도 observeLayerChanges가 중복 호출되어도 문제가 없도록 수정 필요
+
+          // 레이어 맵 초기화 (이미 존재하는 경우 덮어쓰지 않음)
+          const layersMap = ydoc.getMap<any>(`layers-${canvasIdStr}`);
+
+          // 캔버스에 레이어가 있고 레이어 맵이 비어있으면 초기화
+          if (
+            canvas.canvas_layers &&
+            canvas.canvas_layers.length > 0 &&
+            layersMap.size === 0
+          ) {
+            // 트랜잭션으로 묶어 한 번에 처리
+            ydoc.transact(() => {
+              canvas.canvas_layers.forEach((layer) => {
+                layersMap.set(layer.id, layer);
+              });
+            });
+          }
+
+          // 레이어 변경 감지 설정 (항상 호출)
+          observeLayerChanges(canvasIdStr);
+        }
+      });
+    });
 
     // canvasLayersAtom 업데이트 - 기존 레이어 정보 유지하면서 변경
     const canvasLayers = store.get(canvasLayersAtom);
     const updatedCanvasLayers = { ...canvasLayers };
-
     // 추가되거나 변경된 캔버스에 대해 레이어가 없는 경우에만 업데이트
     updatedCanvases.forEach((canvas) => {
       // 기존에 레이어 정보가 없는 캔버스의 경우에만 canvas_layers 정보 사용

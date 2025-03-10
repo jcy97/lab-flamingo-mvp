@@ -37,6 +37,7 @@
     "mongodb": "^6.13.1",
     "next": "^15.0.1",
     "next-auth": "5.0.0-beta.25",
+    "perfect-freehand": "^1.2.2",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-icons": "^5.4.0",

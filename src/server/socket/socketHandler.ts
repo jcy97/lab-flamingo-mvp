@@ -209,6 +209,7 @@ export const projectSocketHandler = (io: Server) => {
 
         // 성공했을 경우, 프로젝트의 다른 사용자들에게 캔버스 추가 알림
         if (result.success) {
+          console.log("발송");
           socket.to(project).emit("canvasAdded", {
             pageId,
             canvas: result.canvas,

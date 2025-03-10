@@ -13,6 +13,26 @@ const Brush: React.FC = () => {
     setBrushProps({ ...brushProps, [property]: value });
   };
 
+  // 부드러움 UI 값을 실제 속성 값으로 변환 (최대 0.7)
+  const convertSmoothingToProperty = (uiValue: number): number => {
+    return (uiValue / 100) * 0.7;
+  };
+
+  // 실제 속성 값을 UI 표시 값으로 변환 (100% 스케일)
+  const convertSmoothingToUI = (propertyValue: number): number => {
+    return (propertyValue / 0.7) * 100;
+  };
+
+  // 부드러움 슬라이더 변경 핸들러
+  const handleSmoothingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uiValue = Number(e.target.value);
+    const propertyValue = convertSmoothingToProperty(uiValue);
+    handlePropertyChange("smoothing", propertyValue);
+  };
+
+  // UI에 표시할 부드러움 값 (0-100%)
+  const smoothingUIValue = convertSmoothingToUI(brushProps.smoothing);
+
   return (
     <div className="space-y-3 p-3">
       <div>
@@ -67,15 +87,13 @@ const Brush: React.FC = () => {
             type="range"
             className="h-2 flex-1 appearance-none rounded bg-gray-200"
             min="0"
-            max="1"
-            step="0.01"
-            value={brushProps.smoothing}
-            onChange={(e) =>
-              handlePropertyChange("smoothing", Number(e.target.value))
-            }
+            max="100"
+            step="1"
+            value={smoothingUIValue}
+            onChange={handleSmoothingChange}
           />
           <span className="w-10 text-right text-xs text-neutral-300">
-            {Math.round(brushProps.smoothing * 100)}%
+            {Math.round(smoothingUIValue)}%
           </span>
         </div>
       </div>
@@ -122,44 +140,6 @@ const Brush: React.FC = () => {
             </option>
           ))}
         </select>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-xs font-medium text-neutral-300">
-          브러시 유형
-        </label>
-        <div className="grid grid-cols-3 gap-1">
-          <button
-            className={`rounded border py-1.5 text-xs ${
-              brushProps.type === "round"
-                ? "border-gray-400 bg-gray-100 font-medium"
-                : "border-gray-300 text-neutral-300"
-            }`}
-            onClick={() => handlePropertyChange("type", "round")}
-          >
-            원형
-          </button>
-          <button
-            className={`rounded border py-1.5 text-xs ${
-              brushProps.type === "square"
-                ? "border-gray-400 bg-gray-100 font-medium"
-                : "border-gray-300 text-neutral-300"
-            }`}
-            onClick={() => handlePropertyChange("type", "square")}
-          >
-            사각형
-          </button>
-          <button
-            className={`rounded border py-1.5 text-xs ${
-              brushProps.type === "texture"
-                ? "border-gray-400 bg-gray-100 font-medium"
-                : "border-gray-300 text-neutral-300"
-            }`}
-            onClick={() => handlePropertyChange("type", "texture")}
-          >
-            텍스처
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -24,6 +24,7 @@ export interface CurrentConnectedUser {
 // 라인 데이터 인터페이스
 export interface LineData {
   points: number[];
+  data?: string; // SVG 경로 문자열 (Path 컴포넌트에서 사용)
   stroke: string;
   strokeWidth: number;
   tension: number;
@@ -35,6 +36,10 @@ export interface LineData {
   shadowBlur?: number;
   shadowColor?: string;
   shadowOpacity?: number;
+  closed?: boolean;
+  fill?: string;
+  storoke?: null;
+  pressures: number[];
   globalCompositeOperation?:
     | "source-over"
     | "source-in"
