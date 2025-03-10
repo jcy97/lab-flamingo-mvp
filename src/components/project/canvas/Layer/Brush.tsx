@@ -222,6 +222,7 @@ const Brush: React.FC<BrushComponentProps> = ({
         stroke: isEraser ? "#000000" : brushProps.color,
         strokeWidth: brushProps.size,
         tension: brushProps.smoothing * 0.5,
+        smoothing: brushProps.smoothing,
         lineCap: brushProps.type === "square" ? "square" : "round",
         lineJoin: brushProps.type === "square" ? "miter" : "round",
         opacity: isEraser ? 1 : brushProps.opacity * (layer.opacity || 1),
@@ -416,7 +417,12 @@ const Brush: React.FC<BrushComponentProps> = ({
           lineCap={line.lineCap}
           lineJoin={line.lineJoin}
           opacity={line.opacity}
+          strokeScaleEnabled={true}
           bezier={line.bezier}
+          shadowColor={line.stroke}
+          shadowBlur={line.smoothing ?? 0 * 10}
+          shadowOffset={{ x: 0, y: 0 }}
+          shadowOpacity={line.opacity * 0.5}
           perfectDrawEnabled={false}
           globalCompositeOperation={
             line.globalCompositeOperation || "source-over"
@@ -437,6 +443,10 @@ const Brush: React.FC<BrushComponentProps> = ({
           perfectDrawEnabled={false}
           listening={false}
           bezier={currentLine.bezier}
+          shadowColor={currentLine.stroke}
+          shadowBlur={currentLine.smoothing ?? 0 * 10}
+          shadowOffset={{ x: 0, y: 0 }}
+          shadowOpacity={currentLine.opacity * 0.5}
           strokeScaleEnabled={true}
           globalCompositeOperation={
             currentLine.globalCompositeOperation || "source-over"
@@ -456,6 +466,10 @@ const Brush: React.FC<BrushComponentProps> = ({
           lineJoin={line.lineJoin}
           perfectDrawEnabled={false}
           listening={false}
+          shadowColor={line.stroke}
+          shadowBlur={line.smoothing ?? 0 * 10}
+          shadowOffset={{ x: 0, y: 0 }}
+          shadowOpacity={line.opacity * 0.5}
           bezier={line.bezier}
           strokeScaleEnabled={true}
           globalCompositeOperation={

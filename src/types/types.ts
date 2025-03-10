@@ -31,6 +31,7 @@ export interface LineData {
   lineJoin: "round" | "miter";
   opacity: number;
   bezier?: boolean;
+  smoothing?: number;
   globalCompositeOperation?:
     | "source-over"
     | "source-in"
