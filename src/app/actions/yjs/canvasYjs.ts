@@ -161,7 +161,6 @@ export const observeCanvasChanges = () => {
     const updatedCanvases = Array.from(canvasesMap.values()).sort(
       (a, b) => a.index - b.index,
     );
-    console.log("수근수근");
     // 새로 추가된 캔버스에 대한 레이어 맵 초기화 및 레이어 변경 감지 설정
     event.keysChanged.forEach((canvasId) => {
       // keys는 String 타입이므로 적절히 형변환

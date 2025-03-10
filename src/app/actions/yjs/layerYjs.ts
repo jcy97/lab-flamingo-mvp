@@ -42,7 +42,6 @@ export const observeLayerChanges = (canvasId: string) => {
     const updatedLayers = Array.from(layerMap.values()).sort(
       (a, b) => a.index - b.index,
     );
-    console.log("레이어 변경");
 
     // 현재 선택된 레이어 정보 가져오기
     const currentLayer = store.get(currentLayerAtom);
