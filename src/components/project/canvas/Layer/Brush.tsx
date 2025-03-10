@@ -186,6 +186,15 @@ const Brush: React.FC<BrushComponentProps> = ({
     };
   };
 
+  // smoothing 값에 따른 그림자 효과 계산 함수
+  const getShadowBlur = (smoothing: number) => {
+    // smoothing이 0.3 미만이면 그림자 없음
+    if (smoothing < 0.3) return 0;
+
+    // smoothing 값에 따라 그림자 강도 조절 (0.3~1.0 => 0~10)
+    return Math.floor(((smoothing - 0.3) / 0.7) * 10);
+  };
+
   // 이벤트 핸들러 설정
   useEffect(() => {
     const stage = stageRef.current;
@@ -228,6 +237,8 @@ const Brush: React.FC<BrushComponentProps> = ({
         opacity: isEraser ? 1 : brushProps.opacity * (layer.opacity || 1),
         bezier: brushProps.smoothing > 0.3,
         globalCompositeOperation: isEraser ? "destination-out" : "source-over",
+        // 그림자 효과 속성은 제거
+        // renderLine 함수에서 통일성 있게 계산하도록 함
       };
 
       setCurrentLine(newLine);
@@ -404,79 +415,54 @@ const Brush: React.FC<BrushComponentProps> = ({
   // visible이 false인 경우 렌더링하지 않음
   if (!layer.visible) return null;
 
+  // 선 렌더링 함수
+  const renderLine = (line: LineData, key: string) => {
+    // 지우개인지 확인
+    const isEraser = line.globalCompositeOperation === "destination-out";
+
+    // 저장된 브러시 속성에서 smoothing 값 가져오기
+    const smoothingValue = line.smoothing || brushProps.smoothing;
+
+    // 그림자 블러 계산 (저장 시와 그리는 중에 일관되게 적용)
+    const shadowBlur = isEraser ? 0 : getShadowBlur(smoothingValue);
+
+    return (
+      <Line
+        key={key}
+        points={line.points}
+        stroke={line.stroke}
+        strokeWidth={line.strokeWidth}
+        tension={line.tension}
+        lineCap={line.lineCap || "round"}
+        lineJoin={line.lineJoin || "round"}
+        opacity={line.opacity}
+        strokeScaleEnabled={true}
+        bezier={line.bezier}
+        perfectDrawEnabled={false}
+        globalCompositeOperation={
+          line.globalCompositeOperation || "source-over"
+        }
+        shadowColor={isEraser ? line.stroke : line.shadowColor || line.stroke}
+        shadowBlur={shadowBlur}
+        shadowOffset={{ x: 0, y: 0 }}
+        shadowOpacity={isEraser ? 0 : line.opacity * 0.5}
+        listening={false}
+      />
+    );
+  };
+
   return (
     <Group ref={groupRef} id={layer.id}>
       {/* 저장된 모든 라인 렌더링 */}
-      {lines.map((line, i) => (
-        <Line
-          key={`line-${i}`}
-          points={line.points}
-          stroke={line.stroke}
-          strokeWidth={line.strokeWidth}
-          tension={line.tension}
-          lineCap={line.lineCap}
-          lineJoin={line.lineJoin}
-          opacity={line.opacity}
-          strokeScaleEnabled={true}
-          bezier={line.bezier}
-          shadowColor={line.stroke}
-          shadowBlur={line.smoothing ?? 0 * 10}
-          shadowOffset={{ x: 0, y: 0 }}
-          shadowOpacity={line.opacity * 0.5}
-          perfectDrawEnabled={false}
-          globalCompositeOperation={
-            line.globalCompositeOperation || "source-over"
-          }
-        />
-      ))}
+      {lines.map((line, i) => renderLine(line, `line-${i}`))}
 
       {/* 현재 그리는 중인 라인 */}
-      {currentLine && (
-        <Line
-          points={currentLine.points}
-          stroke={currentLine.stroke}
-          strokeWidth={currentLine.strokeWidth}
-          tension={currentLine.tension}
-          lineCap={currentLine.lineCap}
-          lineJoin={currentLine.lineJoin}
-          opacity={currentLine.opacity}
-          perfectDrawEnabled={false}
-          listening={false}
-          bezier={currentLine.bezier}
-          shadowColor={currentLine.stroke}
-          shadowBlur={currentLine.smoothing ?? 0 * 10}
-          shadowOffset={{ x: 0, y: 0 }}
-          shadowOpacity={currentLine.opacity * 0.5}
-          strokeScaleEnabled={true}
-          globalCompositeOperation={
-            currentLine.globalCompositeOperation || "source-over"
-          }
-        />
-      )}
+      {currentLine && renderLine(currentLine, "current-line")}
 
       {/* 다른 사용자들이 그리는 중인 라인 (실시간) */}
-      {Object.values(otherUsersDrawingLines).map((line, i) => (
-        <Line
-          key={`temp-line-${i}`}
-          points={line.points}
-          stroke={line.stroke}
-          strokeWidth={line.strokeWidth}
-          tension={line.tension}
-          lineCap={line.lineCap}
-          lineJoin={line.lineJoin}
-          perfectDrawEnabled={false}
-          listening={false}
-          shadowColor={line.stroke}
-          shadowBlur={line.smoothing ?? 0 * 10}
-          shadowOffset={{ x: 0, y: 0 }}
-          shadowOpacity={line.opacity * 0.5}
-          bezier={line.bezier}
-          strokeScaleEnabled={true}
-          globalCompositeOperation={
-            line.globalCompositeOperation || "source-over"
-          }
-        />
-      ))}
+      {Object.values(otherUsersDrawingLines).map((line, i) =>
+        renderLine(line, `temp-line-${i}`),
+      )}
     </Group>
   );
 };

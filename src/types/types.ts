@@ -32,6 +32,9 @@ export interface LineData {
   opacity: number;
   bezier?: boolean;
   smoothing?: number;
+  shadowBlur?: number;
+  shadowColor?: string;
+  shadowOpacity?: number;
   globalCompositeOperation?:
     | "source-over"
     | "source-in"
