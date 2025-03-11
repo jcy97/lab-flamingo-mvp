@@ -457,8 +457,6 @@ export const toggleLayerVisibility = (
       updated_user_id: session.user.id,
       updated_at: new Date(),
     };
-    console.log(1111);
-    console.log(updatedLayer);
     // 캔버스 맵에 업데이트된 레이어 저장
     layersMap.set(layerId, updatedLayer);
   });

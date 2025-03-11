@@ -35,6 +35,21 @@ interface BrushComponentProps {
 }
 
 /**
+ * Ramer-Douglas-Peucker 알고리즘을 사용하여 포인트 배열을 단순화하는 함수
+ * @param points 단순화할 포인트 배열 [x1, y1, x2, y2, ...]
+ * @param tolerance 단순화 허용 오차
+ * @returns 단순화된 포인트 배열
+ */
+
+/**
+ * SVG 경로 문자열을 최적화하는 함수 (소수점 자릿수 제한)
+ */
+const optimizeSvgPath = (pathData: string): string => {
+  // 소수점 3자리로 제한
+  return pathData.replace(/(\d+\.\d{3})\d+/g, "$1");
+};
+
+/**
  * perfect-freehand에서 생성된 포인트 배열을 SVG 경로 문자열로 변환하는 함수
  */
 const getSvgPathFromStroke = (stroke: number[][]): string => {
@@ -85,7 +100,7 @@ const getSvgPathFromStroke = (stroke: number[][]): string => {
     }
   }
 
-  return d.join(" ");
+  return optimizeSvgPath(d.join(" ")); // 최적화 적용
 };
 
 /**
@@ -111,7 +126,17 @@ const getPerfectFreehandOptions = (
     smoothing: smoothing,
     streamline: 0.5,
     simulatePressure: simulatePressure,
-    easing: (t: number) => Math.sin(t * Math.PI * 0.5), // 압력에 따른 사이즈 변화 정도
+    easing: (t: number) => Math.sin(t * Math.PI * 0.5),
+    start: {
+      // 시작 부분 설정 추가
+      taper: 0,
+      cap: true,
+    },
+    end: {
+      // 끝 부분 설정 추가
+      taper: 0,
+      cap: true,
+    },
   };
 };
 
@@ -270,37 +295,6 @@ const Brush: React.FC<BrushComponentProps> = ({
       groupRef.current.getLayer()?.batchDraw();
     }
   }, [layer.layer_content?.transform]);
-
-  useEffect(() => {
-    if (status !== "authenticated") return;
-
-    // 해당 레이어의 브러쉬 인식 초기화
-    const { getOtherUsersDrawingLines, cleanup } = initBrushAwareness(layer.id);
-
-    let animationFrameId: number;
-    const updateFrame = () => {
-      // 반환값은 빈 객체({})일 수 있음
-      const drawingLines = getOtherUsersDrawingLines();
-
-      if (
-        JSON.stringify(drawingLines) !== JSON.stringify(otherUsersDrawingPaths)
-      ) {
-        // 기존 코드...
-      }
-      animationFrameId = requestAnimationFrame(updateFrame);
-    };
-
-    // 애니메이션 프레임 시작
-    animationFrameId = requestAnimationFrame(updateFrame);
-
-    // 정리 함수
-    return () => {
-      cancelAnimationFrame(animationFrameId);
-      if (cleanup) cleanup();
-    };
-  }, [layer.id, status, otherUsersDrawingPaths]);
-
-  // 위 코드를 아래 코드로 대체하세요:
 
   // YJS awareness 설정
   useEffect(() => {
@@ -474,9 +468,6 @@ const Brush: React.FC<BrushComponentProps> = ({
 
       return transformedPoint;
     } catch (e) {
-      // 변환 매트릭스에 문제가 있는 경우 원본 좌표 반환
-      console.error("변환 적용 중 오류:", e);
-
       // 수동으로 변환 적용
       const rad = (groupTransform.rotation * Math.PI) / 180;
       const cos = Math.cos(-rad);
@@ -579,7 +570,7 @@ const Brush: React.FC<BrushComponentProps> = ({
         shadowBlur: shadowBlur,
         shadowColor: isEraser ? "#000000" : brushProps.color,
         shadowOpacity: shadowOpacity,
-        fill: isEraser ? "transparent" : brushProps.color, // perfect-freehand에서 필요
+        fill: isEraser ? "black" : brushProps.color, // perfect-freehand에서 필요, 지우개 수정
       };
 
       setCurrentPath(newPath);
@@ -715,8 +706,39 @@ const Brush: React.FC<BrushComponentProps> = ({
           return;
         }
 
-        // 완료된 패스
-        const completePath = { ...currentPath };
+        // 스트로크 너비와 smoothing에 따라 허용 오차 동적 조정
+        // 스트로크가 작을수록, smoothing이 낮을수록 더 정밀하게 유지
+        const dynamicTolerance = Math.max(
+          0.2,
+          Math.min(0.8, currentPath.smoothing || 0.5) *
+            Math.min(1.0, currentPath.strokeWidth / 10),
+        );
+
+        // 여기서 포인트 단순화 적용 - 동적 허용 오차 사용
+        // const simplifiedPoints = simplifyPoints(pointsRef.current, 1.0);
+        const simplifiedPoints = [...pointsRef.current]; // 원본 포인트 복사
+        const simplifiedPressures = [...pressuresRef.current]; // 원본 필압 복사
+
+        // 원본 포인트로 경로 데이터 생성
+        const options = getPerfectFreehandOptions(
+          currentPath.strokeWidth,
+          currentPath.smoothing || 0.5,
+          !currentPath.pressures,
+        );
+
+        const pathData = getPathDataFromPoints(
+          simplifiedPoints,
+          options,
+          simplifiedPressures,
+        );
+
+        // 완료된 패스에 원본 데이터 적용
+        const completePath = {
+          ...currentPath,
+          points: simplifiedPoints,
+          pressures: simplifiedPressures,
+          data: pathData,
+        };
 
         // 현재 패스를 paths 배열에 추가
         const updatedPaths = [...paths, completePath];
@@ -736,6 +758,23 @@ const Brush: React.FC<BrushComponentProps> = ({
         }
 
         if (onUpdate) {
+          // 저장될 데이터 최적화 - 필요한 정보만 포함
+          const minimalPaths = updatedPaths.map((path) => {
+            const isEraser =
+              path.globalCompositeOperation === "destination-out";
+            return {
+              points: path.points,
+              pressures: path.pressures,
+              data: path.data,
+              stroke: path.stroke,
+              strokeWidth: path.strokeWidth,
+              smoothing: path.smoothing,
+              globalCompositeOperation: path.globalCompositeOperation,
+              opacity: path.opacity,
+              fill: isEraser ? "black" : path.fill || path.stroke, // 지우개 수정
+            };
+          });
+
           const updatedLayerContent = {
             id: layer.layer_content.id,
             layer_id: layer.layer_content.layer_id,
@@ -744,7 +783,7 @@ const Brush: React.FC<BrushComponentProps> = ({
             position_y: layer.layer_content.position_y,
             rotation: layer.layer_content.rotation,
             normal_data: {
-              lines: updatedPaths,
+              lines: minimalPaths,
             } as Record<string, any>,
             shape_data: layer.layer_content.shape_data,
             text_data: layer.layer_content.text_data,
@@ -754,6 +793,92 @@ const Brush: React.FC<BrushComponentProps> = ({
           onUpdate(layer.id, updatedLayerContent);
         }
       }
+    };
+
+    const interpolatePressures = (
+      originalPoints: number[],
+      originalPressures: number[],
+      simplifiedPoints: number[],
+    ): number[] => {
+      const result: number[] = [];
+
+      // 각 단순화된 포인트에 대해 가장 가까운 원본 포인트의 필압 또는 보간된 필압 값 찾기
+      for (let i = 0; i < simplifiedPoints.length; i += 2) {
+        if (i + 1 >= simplifiedPoints.length) break;
+
+        const targetX = simplifiedPoints[i];
+        const targetY = simplifiedPoints[i + 1];
+
+        // 원본 포인트 배열에서 정확히 일치하는 점 찾기
+        let exactMatchIdx = -1;
+        for (let j = 0; j < originalPoints.length; j += 2) {
+          if (
+            Math.abs(originalPoints[j]! - targetX!) < 0.0001 &&
+            Math.abs(originalPoints[j + 1]! - targetY!) < 0.0001
+          ) {
+            exactMatchIdx = j;
+            break;
+          }
+        }
+
+        if (exactMatchIdx >= 0) {
+          // 정확히 일치하는 원본 포인트를 찾았으면 그 필압 사용
+          const pressureIdx = Math.floor(exactMatchIdx / 2);
+          result.push(originalPressures[pressureIdx] || 1);
+        } else {
+          // 가장 가까운 2개의 원본 포인트를 찾아 거리에 따라 필압 보간
+          let minDist1 = Infinity;
+          let minDist2 = Infinity;
+          let minIdx1 = -1;
+          let minIdx2 = -1;
+
+          for (let j = 0; j < originalPoints.length; j += 2) {
+            if (j + 1 >= originalPoints.length) break;
+
+            const dx = originalPoints[j]! - targetX!;
+            const dy = originalPoints[j + 1]! - targetY!;
+            const dist = dx * dx + dy * dy; // 제곱 거리
+
+            if (dist < minDist1) {
+              minDist2 = minDist1;
+              minIdx2 = minIdx1;
+              minDist1 = dist;
+              minIdx1 = j;
+            } else if (dist < minDist2) {
+              minDist2 = dist;
+              minIdx2 = j;
+            }
+          }
+
+          if (minIdx1 >= 0 && minIdx2 >= 0) {
+            // 두 가까운 포인트 사이에서 거리에 따라 필압 보간
+            const pressureIdx1 = Math.floor(minIdx1 / 2);
+            const pressureIdx2 = Math.floor(minIdx2 / 2);
+            const pressure1 = originalPressures[pressureIdx1] || 1;
+            const pressure2 = originalPressures[pressureIdx2] || 1;
+
+            // 거리에 따른 가중치 계산
+            const totalDist = minDist1 + minDist2;
+            if (totalDist > 0) {
+              const weight1 = minDist2 / totalDist; // 거리가 더 가까울수록 가중치가 높음
+              const weight2 = minDist1 / totalDist;
+
+              // 보간된 필압 계산
+              const interpolatedPressure =
+                pressure1 * weight1 + pressure2 * weight2;
+              result.push(interpolatedPressure);
+            } else {
+              // 거리가 0이면 첫 번째 필압 사용
+              result.push(pressure1);
+            }
+          } else {
+            // 매칭 실패 시 기본값 1 사용
+            result.push(1);
+          }
+        }
+      }
+
+      return result;
     };
 
     // 이벤트 리스너 등록
@@ -808,35 +933,26 @@ const Brush: React.FC<BrushComponentProps> = ({
   // visible이 false인 경우 렌더링하지 않음
   if (!layer.visible) return null;
 
-  // 패스 렌더링 함수
+  // 패스 렌더링 함수 - 지우개 수정
   const renderPath = (pathData: LineData, key: string) => {
+    const isEraser = pathData.globalCompositeOperation === "destination-out";
+
     return (
       <Path
         key={key}
         data={pathData.data}
-        fill={
-          pathData.globalCompositeOperation === "destination-out"
-            ? undefined
-            : pathData.fill || pathData.stroke
-        }
-        stroke={
-          pathData.globalCompositeOperation === "destination-out"
-            ? "#000000"
-            : undefined
-        }
-        strokeWidth={
-          pathData.globalCompositeOperation === "destination-out" ? 1 : 0
-        }
+        fill={isEraser ? "black" : pathData.fill || pathData.stroke}
+        stroke={isEraser ? "transparent" : undefined}
+        strokeWidth={0} // 테두리 두께 0
         opacity={pathData.opacity}
         perfectDrawEnabled={false}
         globalCompositeOperation={
           pathData.globalCompositeOperation || "source-over"
         }
-        // 그림자 속성을 그대로 사용
-        shadowColor={pathData.shadowColor}
-        shadowBlur={pathData.shadowBlur}
+        shadowColor={isEraser ? "transparent" : pathData.shadowColor}
+        shadowBlur={isEraser ? 0 : pathData.shadowBlur}
         shadowOffset={{ x: 0, y: 0 }}
-        shadowOpacity={pathData.shadowOpacity}
+        shadowOpacity={isEraser ? 0 : pathData.shadowOpacity}
         listening={false}
       />
     );

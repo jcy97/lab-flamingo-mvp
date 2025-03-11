@@ -202,14 +202,11 @@ export const projectSocketHandler = (io: Server) => {
 
         // 새 캔버스 트랜잭션으로 생성 작업을 수행
         const result = await createCanvas(pageId, canvasData);
-        console.log("신규 캔버스");
-        console.log(result);
         // 콜백으로 결과 반환
         callback(result);
 
         // 성공했을 경우, 프로젝트의 다른 사용자들에게 캔버스 추가 알림
         if (result.success) {
-          console.log("발송");
           socket.to(project).emit("canvasAdded", {
             pageId,
             canvas: result.canvas,
@@ -289,9 +286,6 @@ export const projectSocketHandler = (io: Server) => {
 
         // 새 레이어 생성 작업을 수행
         const result = await createLayer(canvasId, layerData);
-        console.log("신규 레이어 생성:");
-        console.log(result);
-
         // 콜백으로 결과 반환
         callback(result);
       } catch (error) {
