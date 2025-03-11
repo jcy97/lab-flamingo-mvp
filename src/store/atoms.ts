@@ -4,6 +4,7 @@ import { Canvas, Page, Layer, LayerContent } from "@prisma/mongodb-client";
 import { CurrentConnectedUser } from "~/types/types";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
+import { FOCUS_AREA } from "~/constants/focus";
 
 export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
@@ -116,3 +117,9 @@ export const brushPropertiesAtom = atom({
 
 // 트랜스포머 표시 상태 관리
 export const showTransformerAtom = atom<boolean>(false);
+
+//현재 사용자가 포커싱한 영역
+// PAGE: 페이지 영역, CANVAS: 캔버스 영역, DRAWING: 그림 영역, LAYER: 레이어 영역
+export const currentFocusAreaAtom = atom<string>(FOCUS_AREA.DRAWING);
+
+export const canvasObservingAtom = atom<boolean>(false);

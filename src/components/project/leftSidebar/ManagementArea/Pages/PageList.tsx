@@ -39,6 +39,7 @@ const PageList: React.FC = () => {
     if (currentPage) {
       // 현재 페이지의 캔버스 목록 설정
       const canvases = pageCanvases[currentPage.id] || [];
+      console.log(canvases);
       if (canvases.length > 0) {
         setCurrentCanvases(pageCanvases[currentPage.id] ?? []);
         initCanvasesMap(canvases);

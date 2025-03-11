@@ -126,11 +126,12 @@ export const initCanvasesMap = (canvases: CanvasWithLayers[]) => {
 
   const canvasesMap = ydoc.getMap<CanvasWithLayers>("canvasesMap");
 
-  // 기존 맵 데이터 초기화
-  canvasesMap.clear();
-
-  // 새 캔버스 데이터 설정
+  // 단일 트랜잭션으로 모든 데이터 설정
   ydoc.transact(() => {
+    // 기존 맵 데이터 초기화
+    canvasesMap.clear();
+
+    // 새 캔버스 데이터 설정 (레이어 관찰 설정 없이)
     canvases.forEach((canvas) => {
       canvasesMap.set(canvas.id, canvas);
 
@@ -139,14 +140,21 @@ export const initCanvasesMap = (canvases: CanvasWithLayers[]) => {
         const layersMap = ydoc.getMap<any>(`layers-${canvas.id}`);
         layersMap.clear();
 
-        // 레이어 ID를 키로 사용하여 레이어 데이터 설정
         canvas.canvas_layers.forEach((layer) => {
           layersMap.set(layer.id, layer);
         });
-        observeLayerChanges(canvas.id);
       }
     });
   });
+
+  // 데이터 설정이 완료된 후 레이어 관찰 설정 (지연 실행)
+  setTimeout(() => {
+    canvases.forEach((canvas) => {
+      if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+        observeLayerChanges(canvas.id);
+      }
+    });
+  }, 100);
 };
 
 // 캔버스 변경 감지 설정 함수
@@ -175,8 +183,6 @@ export const observeCanvasChanges = () => {
         // 새로 추가된 캔버스가 있을 경우
         if (canvas) {
           // 기존 레이어 관찰자가 없는지 확인을 위한 플래그 변수 (코드 내에서 관리)
-          // 이미 관찰 중인 캔버스에 대한 임시 집합을 활용할 수도 있습니다
-          const layerObserverKey = `layer_observer_${canvasIdStr}`;
 
           // YDoc에 관찰자 상태를 저장할 수 있는 맵이 없으므로
           // 여기서는 매번 레이어 맵 관찰을 설정하는 방식으로 수정

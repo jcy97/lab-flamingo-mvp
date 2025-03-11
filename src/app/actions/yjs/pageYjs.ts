@@ -11,6 +11,7 @@ import {
 import { Page } from "@prisma/mongodb-client";
 import {
   canvasLayersAtom,
+  CanvasWithLayers,
   currentCanvasAtom,
   currentCanvasesAtom,
   currentLayerAtom,
@@ -162,6 +163,31 @@ export const initPageYjs = (project: string, session: Session) => {
       store.set(pagesUpdatedAtom, false);
     }, 2000);
   });
+
+  socket!.on("pageAdded", (newPage) => {
+    console.log("다른 클라이언트에서 페이지 추가 감지:", newPage);
+
+    // 1. 페이지에 캔버스 정보가 있으면 pageCanvasesAtom에 추가
+    if (newPage) {
+      // 새 페이지의 캔버스 정보를 pageCanvasesAtom에 추가
+      store.set(pageCanvasesAtom, (prev) => ({
+        ...prev,
+        [newPage.id]: newPage.page_canvases || [], // 새 페이지 ID를 키로 캔버스 리스트 추가
+      }));
+
+      // 2. 캔버스 레이어 정보도 처리
+      if (newPage.page_canvases && newPage.page_canvases.length > 0) {
+        newPage.page_canvases.forEach((canvas: CanvasWithLayers) => {
+          if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+            store.set(canvasLayersAtom, (prev) => ({
+              ...prev,
+              [canvas.id]: canvas.canvas_layers,
+            }));
+          }
+        });
+      }
+    }
+  });
 };
 
 // 페이지 문서 및 맵 가져오기 함수
@@ -223,7 +249,7 @@ export const reorderPages = (sourceIndex: number, destinationIndex: number) => {
   }
 };
 
-// 페이지 추가 함수 (수정된 버전)
+// 페이지 추가 함수
 export const addPage = (
   pageName: string,
   session: Session,

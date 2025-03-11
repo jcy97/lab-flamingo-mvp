@@ -410,7 +410,7 @@ export const saveLayerContent = (
       ...layer,
       layer_content: data,
     };
-
+    console.log("wjwkd");
     // 캔버스 맵에 업데이트된 캔버스 저장
     layersMap.set(layerId, updatedLayer);
   });

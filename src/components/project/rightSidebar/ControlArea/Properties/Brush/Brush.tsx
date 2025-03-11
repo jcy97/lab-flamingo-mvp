@@ -42,7 +42,7 @@ const Brush: React.FC = () => {
         <div className="flex items-center gap-2">
           <input
             type="range"
-            className="h-2 flex-1 appearance-none rounded bg-gray-200"
+            className="h-2 flex-1 appearance-none rounded bg-gray-200 outline-none"
             min="1"
             max="100"
             value={brushProps.size}
@@ -63,7 +63,7 @@ const Brush: React.FC = () => {
         <div className="flex items-center gap-2">
           <input
             type="range"
-            className="h-2 flex-1 appearance-none rounded bg-gray-200"
+            className="h-2 flex-1 appearance-none rounded bg-gray-200 outline-none"
             min="0"
             max="1"
             step="0.01"
@@ -85,7 +85,7 @@ const Brush: React.FC = () => {
         <div className="flex items-center gap-2">
           <input
             type="range"
-            className="h-2 flex-1 appearance-none rounded bg-gray-200"
+            className="h-2 flex-1 appearance-none rounded bg-gray-200 outline-none"
             min="0"
             max="100"
             step="1"
@@ -105,7 +105,7 @@ const Brush: React.FC = () => {
         <div className="relative mr-2 inline-block h-5 w-10">
           <input
             type="checkbox"
-            className="h-0 w-0 opacity-0"
+            className="h-0 w-0 opacity-0 outline-none"
             id="pressure-switch"
             checked={brushProps.pressure}
             onChange={(e) => handlePropertyChange("pressure", e.target.checked)}
