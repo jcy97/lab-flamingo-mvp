@@ -1,4 +1,4 @@
-import { PageWithCanvases } from "../../store/atoms";
+import { LayerWithContents, PageWithCanvases } from "../../store/atoms";
 import { mongo } from "../mongo";
 
 /**
@@ -322,6 +322,219 @@ export const deletePage = async (pageId: string) => {
 };
 
 /**
+ * 기존 페이지를 복제하여 새로운 페이지와 그에 속한 캔버스 및 레이어들을 모두 복제하는 함수
+ * @param {string} pageId - 복제할 원본 페이지 ID
+ * @param {Object} pageData - 복제 시 변경될 데이터 (이름, 생성자 등)
+ * @returns {Promise<Object>} - 복제 작업 결과와 성공 여부
+ */
+export const duplicatePage = async (
+  pageId: string,
+  pageData: {
+    name: string;
+    user_id: string;
+  },
+) => {
+  try {
+    // 1. 원본 페이지 정보 조회 (캔버스, 레이어 및 레이어 컨텐츠 포함)
+    const originalPage = await mongo.page.findUnique({
+      where: { id: pageId },
+      include: {
+        page_canvases: {
+          orderBy: { index: "asc" },
+          include: {
+            canvas_layers: {
+              orderBy: { index: "asc" },
+              include: {
+                layer_content: true, // 레이어 컨텐츠 포함
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!originalPage) {
+      return {
+        success: false,
+        error: "복제할 원본 페이지를 찾을 수 없습니다.",
+      };
+    }
+
+    // 2. 해당 프로젝트의 모든 페이지 조회 (인덱스 계산을 위해)
+    const existingPages = await mongo.page.findMany({
+      where: { project_id: originalPage.project_id },
+      orderBy: { index: "desc" },
+      take: 1,
+    });
+
+    // 3. 새 페이지의 인덱스 계산 (기존 페이지 중 가장 큰 인덱스 + 1)
+    const newIndex = existingPages.length > 0 ? existingPages[0]!.index + 1 : 0;
+
+    // 4. 트랜잭션으로 페이지 복제 및 캔버스, 레이어, 컨텐츠 복제 진행
+    const result = await mongo.$transaction(async (tx) => {
+      // 4-1. 새 페이지 생성
+      const newPage = await tx.page.create({
+        data: {
+          name: pageData.name,
+          index: newIndex,
+          project_id: originalPage.project_id,
+          created_user_id: pageData.user_id,
+          updated_user_id: pageData.user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 4-2. 각 캔버스와 그에 속한 레이어들을 복제
+      const newCanvases = [];
+      for (let i = 0; i < originalPage.page_canvases.length; i++) {
+        const originalCanvas = originalPage.page_canvases[i]!;
+
+        // 새 캔버스 생성
+        const newCanvas = await tx.canvas.create({
+          data: {
+            name: originalCanvas.name,
+            index: originalCanvas.index,
+            width: originalCanvas.width,
+            height: originalCanvas.height,
+            background: originalCanvas.background,
+            page_id: newPage.id,
+            created_user_id: pageData.user_id,
+            updated_user_id: pageData.user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        });
+
+        // 레이어 복제를 위한 ID 매핑
+        const layerIdMap = new Map(); // 원본 레이어 ID -> 새 레이어 ID 매핑
+
+        // 모든 레이어를 복제하는 재귀 함수
+        const cloneLayer = async (
+          originalLayer: any,
+          parentLayerId: string | null = null,
+        ) => {
+          // 레이어 생성
+          const newLayer = await tx.layer.create({
+            data: {
+              name: originalLayer.name,
+              index: originalLayer.index,
+              type: originalLayer.type || "NORMAL",
+              visible: originalLayer.visible !== false,
+              opacity: originalLayer.opacity || 1.0,
+              blend_mode: originalLayer.blend_mode || "NORMAL",
+              locked: originalLayer.locked || false,
+              canvas_id: newCanvas.id,
+              parent_layer_id: parentLayerId,
+              created_user_id: pageData.user_id,
+              updated_user_id: pageData.user_id,
+              created_at: new Date(),
+              updated_at: new Date(),
+            },
+          });
+
+          // 원본 레이어 ID와 새 레이어 ID 매핑 저장
+          layerIdMap.set(originalLayer.id, newLayer.id);
+
+          // 레이어 컨텐츠 복제 (있는 경우에만)
+          if (originalLayer.layer_content) {
+            const content = originalLayer.layer_content;
+
+            await tx.layerContent.create({
+              data: {
+                layer_id: newLayer.id,
+                position_x: content.position_x || 0,
+                position_y: content.position_y || 0,
+                rotation: content.rotation || 0,
+                transform: content.transform || {
+                  x: 0,
+                  y: 0,
+                  width: 100,
+                  height: 100,
+                  rotation: 0,
+                  scaleX: 1,
+                  scaleY: 1,
+                },
+                normal_data: content.normal_data || null,
+                shape_data: content.shape_data || null,
+                text_data: content.text_data || null,
+                image_data: content.image_data || null,
+              },
+            });
+          }
+
+          // 자식 레이어 복제
+          try {
+            // 전체 레이어 목록에서 자식 레이어 찾기
+            const childLayers = originalCanvas.canvas_layers.filter(
+              (layer: any) => layer.parent_layer_id === originalLayer.id,
+            );
+
+            for (const childLayer of childLayers) {
+              await cloneLayer(childLayer, newLayer.id);
+            }
+          } catch (error) {
+            console.error("자식 레이어 복제 중 오류 발생:", error);
+          }
+
+          return newLayer;
+        };
+
+        // 최상위 레이어(parent_layer_id가 null인 레이어)부터 시작
+        const topLevelLayers = originalCanvas.canvas_layers.filter(
+          (layer: any) => !layer.parent_layer_id,
+        );
+
+        // 모든 최상위 레이어를 복제
+        const newLayers = [];
+        for (const topLayer of topLevelLayers) {
+          try {
+            const newLayer = await cloneLayer(topLayer);
+            newLayers.push(newLayer);
+          } catch (error) {
+            console.error("최상위 레이어 복제 중 오류 발생:", error);
+          }
+        }
+
+        // 복제된 모든 레이어 다시 조회
+        const allNewLayers = await tx.layer.findMany({
+          where: { canvas_id: newCanvas.id },
+          orderBy: { index: "asc" },
+          include: { layer_content: true },
+        });
+
+        // 객체 확장하지 말고 새 객체로 생성하여 타입 에러 방지
+        const canvasWithLayers = {
+          ...newCanvas,
+          canvas_layers: allNewLayers,
+        };
+
+        newCanvases.push(canvasWithLayers);
+      }
+      // 4-3. 새 페이지에 캔버스 목록 포함하여 반환
+      return {
+        ...newPage,
+        page_canvases: newCanvases,
+      };
+    });
+
+    // 5. 복제된 페이지 정보 반환
+    return {
+      success: true,
+      page: result,
+    };
+  } catch (error) {
+    console.error("페이지 복제 중 오류 발생:", error);
+    return {
+      success: false,
+      error:
+        "페이지 복제에 실패했습니다. " +
+        (error instanceof Error ? error.message : String(error)),
+    };
+  }
+};
+
+/**
  * 캔버스 정보를 업데이트하는 함수
  *
  * @param {string} canvasId - 업데이트할 캔버스의 ID
@@ -593,6 +806,209 @@ export const deleteCanvas = async (canvasId: string) => {
     return {
       success: false,
       error: "캔버스 삭제에 실패했습니다.",
+    };
+  }
+};
+
+/**
+ * 기존 캔버스를 복제하여 새로운 캔버스와 그에 속한 레이어, 컨텐츠를 생성하는 함수
+ * @param {string} pageId - 복제할 캔버스가 속한 페이지 ID
+ * @param {string} canvasId - 복제할 원본 캔버스 ID
+ * @param {Object} canvasData - 복제 시 변경될 데이터 (이름, 생성자 등)
+ * @returns {Promise<Object>} - 복제 작업 결과와 성공 여부
+ */
+export const duplicateCanvas = async (
+  pageId: string,
+  canvasId: string,
+  canvasData: {
+    name: string;
+    width?: number;
+    height?: number;
+    background?: string;
+    created_user_id: string;
+    updated_user_id: string;
+  },
+) => {
+  try {
+    // 1. 원본 캔버스 정보 조회 (레이어 및 레이어 컨텐츠 포함)
+    const originalCanvas = await mongo.canvas.findUnique({
+      where: { id: canvasId },
+      include: {
+        canvas_layers: {
+          orderBy: { index: "asc" },
+          include: {
+            layer_content: true, // 레이어 컨텐츠 포함
+            child_layers: true, // 자식 레이어 포함
+          },
+        },
+      },
+    });
+
+    if (!originalCanvas) {
+      return {
+        success: false,
+        error: "복제할 원본 캔버스를 찾을 수 없습니다.",
+      };
+    }
+
+    // 2. 해당 페이지의 모든 캔버스 조회 (인덱스 계산을 위해)
+    const existingCanvases = await mongo.canvas.findMany({
+      where: { page_id: pageId },
+      orderBy: { index: "desc" },
+      take: 1,
+    });
+
+    // 3. 새 캔버스의 인덱스 계산 (기존 캔버스 중 가장 큰 인덱스 + 1)
+    const newIndex =
+      existingCanvases.length > 0 ? existingCanvases[0]!.index + 1 : 0;
+
+    // 4. 트랜잭션으로 캔버스 복제 및 레이어, 컨텐츠 복제 진행
+    const result = await mongo.$transaction(async (tx) => {
+      // 4-1. 새 캔버스 생성
+      const newCanvas = await tx.canvas.create({
+        data: {
+          name: canvasData.name,
+          width: canvasData.width ?? originalCanvas.width,
+          height: canvasData.height ?? originalCanvas.height,
+          background: canvasData.background ?? originalCanvas.background,
+          page_id: pageId,
+          index: newIndex,
+          created_user_id: canvasData.created_user_id,
+          updated_user_id: canvasData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+        },
+      });
+
+      // 4-2. 레이어 복제 (부모 레이어 ID 매핑을 위한 객체)
+      const layerIdMap = new Map(); // 원본 레이어 ID -> 새 레이어 ID 매핑
+
+      // 모든 레이어를 복제하는 재귀 함수
+      const cloneLayer = async (
+        originalLayer: any,
+        parentLayerId: string | null = null,
+      ) => {
+        // 레이어 생성
+        const newLayer = await tx.layer.create({
+          data: {
+            name: originalLayer.name,
+            index: originalLayer.index,
+            type: originalLayer.type || "NORMAL",
+            visible: originalLayer.visible !== false,
+            opacity: originalLayer.opacity || 1.0,
+            blend_mode: originalLayer.blend_mode || "NORMAL",
+            locked: originalLayer.locked || false,
+            canvas_id: newCanvas.id,
+            parent_layer_id: parentLayerId,
+            created_user_id: canvasData.created_user_id,
+            updated_user_id: canvasData.updated_user_id,
+            created_at: new Date(),
+            updated_at: new Date(),
+          },
+        });
+
+        // 원본 레이어 ID와 새 레이어 ID 매핑 저장
+        layerIdMap.set(originalLayer.id, newLayer.id);
+
+        // 레이어 컨텐츠 복제 (있는 경우에만)
+        if (originalLayer.layer_content) {
+          const content = originalLayer.layer_content;
+
+          await tx.layerContent.create({
+            data: {
+              layer_id: newLayer.id,
+              position_x: content.position_x || 0,
+              position_y: content.position_y || 0,
+              rotation: content.rotation || 0,
+              transform: content.transform || {
+                x: 0,
+                y: 0,
+                width: 100,
+                height: 100,
+                rotation: 0,
+                scaleX: 1,
+                scaleY: 1,
+              },
+              normal_data: content.normal_data || null,
+              shape_data: content.shape_data || null,
+              text_data: content.text_data || null,
+              image_data: content.image_data || null,
+            },
+          });
+        }
+
+        // 자식 레이어가 있으면 재귀적으로 복제
+        try {
+          // 방법 1: child_layers 속성이 있는 경우
+          if (
+            originalLayer.child_layers &&
+            Array.isArray(originalLayer.child_layers) &&
+            originalLayer.child_layers.length > 0
+          ) {
+            for (const childLayer of originalLayer.child_layers) {
+              await cloneLayer(childLayer, newLayer.id);
+            }
+          } else {
+            // 방법 2: 전체 레이어 목록에서 자식 레이어 찾기
+            const childLayers = originalCanvas.canvas_layers.filter(
+              (layer) => layer.parent_layer_id === originalLayer.id,
+            );
+
+            for (const childLayer of childLayers) {
+              await cloneLayer(childLayer, newLayer.id);
+            }
+          }
+        } catch (error) {
+          console.error("자식 레이어 복제 중 오류 발생:", error);
+          // 오류 처리 - 자식 레이어 복제에 실패해도 부모 레이어는 반환
+        }
+
+        return newLayer;
+      };
+
+      // 최상위 레이어(parent_layer_id가 null인 레이어)부터 시작
+      const topLevelLayers = originalCanvas.canvas_layers.filter(
+        (layer) => !layer.parent_layer_id,
+      );
+
+      // 모든 최상위 레이어를 복제
+      const newLayers = [];
+      for (const topLayer of topLevelLayers) {
+        try {
+          const newLayer = await cloneLayer(topLayer);
+          newLayers.push(newLayer);
+        } catch (error) {
+          console.error("최상위 레이어 복제 중 오류 발생:", error);
+          // 개별 레이어 복제 실패 시 계속 진행
+        }
+      }
+
+      // 4-3. 복제된 모든 레이어 다시 조회
+      const allNewLayers = await tx.layer.findMany({
+        where: { canvas_id: newCanvas.id },
+        orderBy: { index: "asc" },
+        include: { layer_content: true },
+      });
+
+      // 4-4. 새 캔버스에 레이어 목록 포함하여 반환
+      return {
+        ...newCanvas,
+        canvas_layers: allNewLayers,
+      };
+    });
+
+    // 5. 복제된 캔버스 정보 반환
+    return {
+      success: true,
+      canvas: result,
+    };
+  } catch (error) {
+    console.error("캔버스 복제 중 오류 발생:", error);
+    return {
+      success: false,
+      error:
+        "캔버스 복제에 실패했습니다. " +
+        (error instanceof Error ? error.message : String(error)),
     };
   }
 };

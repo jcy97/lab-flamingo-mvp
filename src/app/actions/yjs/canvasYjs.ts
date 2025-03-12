@@ -682,3 +682,95 @@ export const updateCanvas = (
     );
   }
 };
+
+// 캔버스 복제
+export const duplicateCanvas = (
+  pageId: string,
+  canvasId: string,
+  session: Session,
+): Promise<string | null> => {
+  const canvasesMap = getCanvasesMap();
+  if (!canvasesMap) return Promise.resolve(null);
+
+  const doc = getCanvasYdoc();
+  if (!doc) return Promise.resolve(null);
+
+  // 원본 캔버스 데이터 가져오기
+  const originalCanvas = canvasesMap.get(canvasId);
+  if (!originalCanvas) return Promise.resolve(null);
+
+  // 현재 캔버스 상태 가져오기
+  const canvases = store.get(currentCanvasesAtom) || [];
+
+  // 현재 페이지의 캔버스만 필터링
+  const pageCanvases = canvases.filter((canvas) => canvas.page_id === pageId);
+
+  // 서버에 캔버스 복제 요청
+  const socket = store.get(projectSocketAtom);
+  if (!socket) return Promise.resolve(null);
+
+  // Promise로 감싸서 socket 응답을 기다리게 함
+  return new Promise((resolve) => {
+    socket.emit(
+      "duplicateCanvas",
+      {
+        pageId: pageId,
+        canvasId: canvasId,
+        project: socket.id,
+        canvasData: {
+          name: `${originalCanvas.name} 복사본`,
+          width: originalCanvas.width,
+          height: originalCanvas.height,
+          background: originalCanvas.background,
+          created_user_id: session.user.id,
+          updated_user_id: session.user.id,
+        },
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("캔버스 복제 실패:", response.error);
+          resolve(null);
+          return;
+        }
+
+        const newCanvas = response.canvas;
+
+        doc.transact(() => {
+          // 캔버스 맵에 새 캔버스 추가
+          canvasesMap.set(newCanvas.id, newCanvas);
+
+          // 새 캔버스의 레이어가 있다면 레이어맵에도 추가
+          if (newCanvas.canvas_layers && newCanvas.canvas_layers.length > 0) {
+            const layersMap = doc.getMap<LayerWithContents>(
+              `layers-${newCanvas.id}`,
+            );
+            newCanvas.canvas_layers.forEach((layer: LayerWithContents) => {
+              layersMap.set(layer.id, layer);
+            });
+            // 레이어 변경 감지 설정
+            observeLayerChanges(newCanvas.id);
+          }
+        });
+
+        // 새로 복제된 캔버스를 선택 상태로 설정
+        // 맵에서 모든 캔버스 가져오기
+        const updatedCanvases = Array.from(canvasesMap.values())
+          .filter((canvas) => canvas.page_id === pageId)
+          .sort((a, b) => a.index - b.index);
+
+        // 상태 직접 업데이트
+        store.set(currentCanvasesAtom, updatedCanvases);
+        store.set(currentCanvasAtom, newCanvas);
+
+        // 레이어 정보도 업데이트
+        if (newCanvas.canvas_layers && newCanvas.canvas_layers.length > 0) {
+          store.set(currentLayersAtom, newCanvas.canvas_layers);
+          store.set(currentLayerAtom, newCanvas.canvas_layers[0]);
+        }
+
+        // 실제 생성된 캔버스 ID 반환
+        resolve(newCanvas.id);
+      },
+    );
+  });
+};

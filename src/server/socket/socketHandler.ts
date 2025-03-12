@@ -10,6 +10,8 @@ import {
   createNewPageWithDefaults,
   deleteCanvas,
   deletePage,
+  duplicateCanvas,
+  duplicatePage,
   reorderCanvases,
   updateCanvas,
   updatePage,
@@ -151,6 +153,32 @@ export const projectSocketHandler = (io: Server) => {
       }
     });
 
+    // 페이지 복제 이벤트 핸들러
+    socket.on("duplicatePage", async (data, callback) => {
+      try {
+        const { pageId, project, pageData } = data;
+
+        // 페이지 복제 작업 수행
+        const result = await duplicatePage(pageId, pageData);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 페이지 추가 알림
+        if (result.success) {
+          socket.to(project).emit("pageDuplicated", {
+            page: result.page,
+            success: true,
+          });
+        }
+      } catch (error) {
+        console.error("페이지 복제 실패:", error);
+        callback({
+          success: false,
+          error: "페이지 복제에 실패했습니다.",
+        });
+      }
+    });
     socket.on(
       "updateCanvas",
       async ({ canvasId, pageId, project, updates }, callback) => {
@@ -280,6 +308,36 @@ export const projectSocketHandler = (io: Server) => {
         }
       },
     );
+
+    // projectSocketHandler.ts 파일에 추가할 코드
+
+    // 캔버스 복제 이벤트 핸들러 추가
+    socket.on("duplicateCanvas", async (data, callback) => {
+      try {
+        const { pageId, canvasId, project, canvasData } = data;
+
+        // 새 캔버스 복제 작업을 수행
+        const result = await duplicateCanvas(pageId, canvasId, canvasData);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 캔버스 추가 알림
+        if (result.success) {
+          socket.to(project).emit("canvasDuplicated", {
+            pageId,
+            canvas: result.canvas,
+          });
+        }
+      } catch (error) {
+        console.error("캔버스 복제 실패:", error);
+        callback({
+          success: false,
+          error: "캔버스 복제에 실패했습니다.",
+        });
+      }
+    });
+
     // 레이어 생성 이벤트 핸들러 추가
     socket.on("createLayer", async (data, callback) => {
       try {

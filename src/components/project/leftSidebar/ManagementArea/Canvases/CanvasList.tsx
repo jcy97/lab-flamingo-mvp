@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { IoMdSettings } from "react-icons/io";
 import { BiRename, BiTrash, BiEdit } from "react-icons/bi";
+import { IoDuplicateOutline } from "react-icons/io5";
 import {
   canvasLayersAtom,
   currentCanvasAtom,
@@ -18,6 +19,7 @@ import {
   renameCanvas,
   reorderCanvases,
   updateCanvas,
+  duplicateCanvas,
 } from "~/app/actions/yjs/canvasYjs";
 import CanvasEditPopup from "./CanvasEditPopup";
 import PopupPortal from "~/components/common/PopupPotal";
@@ -39,12 +41,43 @@ const CanvasList: React.FC = () => {
   const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>("");
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const settingsRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
   // 캔버스 편집 팝업 상태
   const [isEditPopupOpen, setIsEditPopupOpen] = useState<boolean>(false);
   const [editingCanvas, setEditingCanvas] = useState<any>(null);
+
+  // Ctrl+D / Command+D 단축키 이벤트 처리 추가
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+D 또는 Command+D가 눌렸을 때
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+        e.preventDefault(); // 브라우저 기본 동작 방지 (북마크 등)
+
+        // 현재 선택된 캔버스가 있을 때만 복제 기능 수행
+        if (currentCanvas && currentPage && session) {
+          handleDuplicateCanvas(currentCanvas);
+        }
+      }
+    };
+
+    // 최상위 div에 이벤트 리스너 추가
+    const containerElement = containerRef.current;
+    if (containerElement) {
+      containerElement.addEventListener("keydown", handleKeyDown);
+    }
+
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      if (containerElement) {
+        containerElement.removeEventListener("keydown", handleKeyDown);
+      }
+    };
+  }, [currentCanvas, currentPage, session]);
 
   // 캔버스가 변경될 때 레이어 관련 처리
   useEffect(() => {
@@ -193,10 +226,27 @@ const CanvasList: React.FC = () => {
     }
   };
 
-  // 설정 메뉴 토글
+  // 설정 메뉴 토글 - 수정된 버전
   const toggleMenu = (e: React.MouseEvent, canvasId: string) => {
     e.stopPropagation(); // 캔버스 선택 이벤트 방지
-    setMenuOpen(menuOpen === canvasId ? null : canvasId);
+
+    // 이미 열린 메뉴를 닫는 경우
+    if (menuOpen === canvasId) {
+      setMenuOpen(null);
+      return;
+    }
+
+    // 메뉴 위치 계산
+    const settingsIcon = settingsRefs.current[canvasId];
+    if (settingsIcon) {
+      const rect = settingsIcon.getBoundingClientRect();
+      // 팝업 메뉴가 뷰포트 바깥으로 나가지 않도록 위치 조정
+      const left = Math.min(rect.right - 144, window.innerWidth - 150);
+      const top = rect.bottom + 5;
+      setMenuPosition({ top, left });
+    }
+
+    setMenuOpen(canvasId);
   };
 
   // 메뉴에서 이름 변경 시작
@@ -243,6 +293,28 @@ const CanvasList: React.FC = () => {
     }
   };
 
+  // 캔버스 복제 기능 추가
+  const handleDuplicateClick = (e: React.MouseEvent, canvas: any) => {
+    e.stopPropagation();
+    handleDuplicateCanvas(canvas);
+  };
+
+  // 캔버스 복제 함수
+  const handleDuplicateCanvas = (canvas: any) => {
+    if (!currentPage || !session) return;
+
+    // YJS를 통해 캔버스 복제 함수 호출
+    duplicateCanvas(currentPage.id, canvas.id, session).then((newCanvasId) => {
+      if (newCanvasId) {
+        console.log(`캔버스 복제 성공: ${newCanvasId}`);
+      } else {
+        console.error("캔버스 복제 실패");
+      }
+    });
+
+    setMenuOpen(null);
+  };
+
   // 캔버스 삭제 처리
   const handleDeleteClick = (
     e: React.MouseEvent,
@@ -271,7 +343,11 @@ const CanvasList: React.FC = () => {
   }
 
   return (
-    <div className="h-[90%] overflow-y-auto">
+    <div
+      ref={containerRef}
+      className="h-[90%] overflow-y-auto"
+      tabIndex={0} // 키보드 이벤트를 받기 위해 tabIndex 추가
+    >
       <div className="flex flex-col items-center gap-4 py-2">
         {canvases
           .sort((a, b) => a.index - b.index)
@@ -325,49 +401,17 @@ const CanvasList: React.FC = () => {
                   )}
 
                   {/* 설정 아이콘과 메뉴 */}
-                  <div className="relative">
+                  <div
+                    className="relative"
+                    ref={(el) => {
+                      settingsRefs.current[canvas.id] = el;
+                    }}
+                  >
                     <IoMdSettings
                       className="text-neutral-100 duration-150 hover:scale-105 hover:cursor-pointer"
                       size={18}
                       onClick={(e) => toggleMenu(e, canvas.id)}
                     />
-
-                    {/* 설정 팝업 메뉴 */}
-                    {menuOpen === canvas.id && (
-                      <div
-                        ref={menuRef}
-                        className="absolute right-0 top-6 z-50 w-36 rounded bg-neutral-800 shadow-lg"
-                        onClick={(e) => e.stopPropagation()} // 캔버스 선택 방지
-                      >
-                        <div className="flex flex-col py-1">
-                          <button
-                            className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
-                            onClick={(e) => handleEditClick(e, canvas)}
-                          >
-                            <BiEdit size={16} />
-                            <span>수정</span>
-                          </button>
-                          <button
-                            className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
-                            onClick={(e) =>
-                              handleRenameClick(e, canvas.id, canvas.name)
-                            }
-                          >
-                            <BiRename size={16} />
-                            <span>이름 변경</span>
-                          </button>
-                          <button
-                            className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"
-                            onClick={(e) =>
-                              handleDeleteClick(e, canvas.id, canvas.page_id)
-                            }
-                          >
-                            <BiTrash size={16} />
-                            <span>삭제</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -384,7 +428,67 @@ const CanvasList: React.FC = () => {
           ))}
       </div>
 
-      {/* PopupPortal을 사용하여 캔버스 편집 팝업 렌더링 */}
+      {/* 설정 팝업 메뉴 - Portal 사용하여 DOM 최상위에 렌더링 */}
+      <PopupPortal isOpen={menuOpen !== null}>
+        {menuOpen !== null && (
+          <div
+            ref={menuRef}
+            className="fixed z-[1000] w-36 rounded bg-neutral-800 shadow-lg"
+            style={{
+              top: `${menuPosition.top}px`,
+              left: `${menuPosition.left}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col py-1">
+              {/* 현재 열린 메뉴에 해당하는 캔버스 찾기 */}
+              {(() => {
+                const canvas = canvases.find((c) => c.id === menuOpen);
+                if (!canvas) return null;
+
+                return (
+                  <>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) => handleEditClick(e, canvas)}
+                    >
+                      <BiEdit size={16} />
+                      <span>수정</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) =>
+                        handleRenameClick(e, canvas.id, canvas.name)
+                      }
+                    >
+                      <BiRename size={16} />
+                      <span>이름 변경</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) => handleDuplicateClick(e, canvas)}
+                    >
+                      <IoDuplicateOutline size={16} />
+                      <span>복제</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"
+                      onClick={(e) =>
+                        handleDeleteClick(e, canvas.id, canvas.page_id)
+                      }
+                    >
+                      <BiTrash size={16} />
+                      <span>삭제</span>
+                    </button>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+      </PopupPortal>
+
+      {/* 캔버스 편집 팝업 */}
       <PopupPortal isOpen={isEditPopupOpen}>
         {editingCanvas && (
           <CanvasEditPopup

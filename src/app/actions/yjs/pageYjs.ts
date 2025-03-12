@@ -477,3 +477,93 @@ export const renamePage = (
     });
   }
 };
+
+// 페이지 복제 함수
+export const duplicatePage = (
+  pageId: string,
+  session: Session,
+): Promise<string | null> => {
+  const yPagesMap = getYPagesMap();
+  if (!yPagesMap) return Promise.resolve(null);
+
+  const doc = getPageYdoc();
+  if (!doc) return Promise.resolve(null);
+
+  // 원본 페이지 데이터 가져오기
+  const originalPage = yPagesMap.get(pageId);
+  if (!originalPage) return Promise.resolve(null);
+
+  // 서버에 페이지 복제 요청
+  const socket = store.get(projectSocketAtom);
+  if (!socket) return Promise.resolve(null);
+
+  // Promise로 감싸서 socket 응답을 기다리게 함
+  return new Promise((resolve) => {
+    socket.emit(
+      "duplicatePage",
+      {
+        pageId: pageId,
+        project: originalPage.project_id,
+        pageData: {
+          name: `${originalPage.name} 복사본`,
+          user_id: session.user.id,
+        },
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("페이지 복제 실패:", response.error);
+          resolve(null);
+          return;
+        }
+
+        const newPage = response.page;
+
+        doc.transact(() => {
+          // Y.Map에 새 페이지 추가
+          yPagesMap.set(newPage.id, newPage);
+        });
+
+        // 새 페이지의 캔버스 정보를 pageCanvasesAtom에 추가
+        store.set(pageCanvasesAtom, (prev) => ({
+          ...prev,
+          [newPage.id]: newPage.page_canvases || [],
+        }));
+
+        // 새 페이지의 캔버스에 대한 레이어 정보 추가
+        if (newPage.page_canvases && newPage.page_canvases.length > 0) {
+          newPage.page_canvases.forEach((canvas: CanvasWithLayers) => {
+            if (canvas.canvas_layers && canvas.canvas_layers.length > 0) {
+              store.set(canvasLayersAtom, (prev) => ({
+                ...prev,
+                [canvas.id]: canvas.canvas_layers,
+              }));
+            }
+          });
+        }
+
+        // 새로 복제된 페이지를 현재 페이지로 설정
+        store.set(currentPageAtom, newPage);
+
+        // 새 페이지의 첫 번째 캔버스와 레이어 설정
+        if (newPage.page_canvases?.length > 0) {
+          store.set(currentCanvasesAtom, newPage.page_canvases);
+          store.set(currentCanvasAtom, newPage.page_canvases[0]);
+
+          if (newPage.page_canvases[0]?.canvas_layers?.length > 0) {
+            store.set(
+              currentLayersAtom,
+              newPage.page_canvases[0].canvas_layers,
+            );
+            store.set(
+              currentLayerAtom,
+              newPage.page_canvases[0].canvas_layers[0],
+            );
+          }
+        }
+
+        // 실제 생성된 페이지 ID 반환
+        resolve(newPage.id);
+      },
+    );
+  });
+};
