@@ -18,6 +18,7 @@ import {
 import {
   createLayer,
   deleteLayer,
+  duplicateLayer,
   reorderLayers,
   toggleLayerVisibility,
   updateLayer,
@@ -438,6 +439,33 @@ export const projectSocketHandler = (io: Server) => {
         }
       },
     );
+
+    socket.on("duplicateLayer", async (data, callback) => {
+      try {
+        const { canvasId, layerId, project, layerData } = data;
+
+        // 레이어 복제 작업 수행
+        const result = await duplicateLayer(canvasId, layerId, layerData);
+
+        // 콜백으로 결과 반환
+        callback(result);
+
+        // 성공했을 경우, 프로젝트의 다른 사용자들에게 레이어 추가 알림 (선택적)
+        if (result.success) {
+          socket.to(project).emit("layerAdded", {
+            canvasId,
+            layer: result.layer,
+          });
+        }
+      } catch (error) {
+        console.error("레이어 복제 실패:", error);
+        callback({
+          success: false,
+          error: "레이어 복제에 실패했습니다.",
+        });
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log("사용자 연결이 종료되었습니다.");
       const response = removeConnectedUser(socket.id);

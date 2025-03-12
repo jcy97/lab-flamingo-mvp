@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { IoMdEye, IoMdEyeOff } from "react-icons/io";
 import { HiOutlineAdjustments } from "react-icons/hi";
 import { BiRename, BiTrash } from "react-icons/bi";
+import { IoDuplicateOutline } from "react-icons/io5";
 import { MdOutlinePhotoSizeSelectLarge } from "react-icons/md";
 import { useAtom, useAtomValue } from "jotai";
 import {
@@ -15,6 +16,7 @@ import {
 } from "~/store/atoms";
 import {
   deleteLayer,
+  duplicateLayer,
   renameLayer,
   reorderLayer,
   toggleLayerVisibility,
@@ -158,7 +160,7 @@ const LayerList: React.FC = () => {
     }
   };
 
-  // 크기 조정 처리 (새로 추가된 함수)
+  // 크기 조정 처리
   const handleResizeClick = (e: React.MouseEvent, layer: LayerWithContents) => {
     e.stopPropagation();
     // 현재 레이어로 설정
@@ -169,6 +171,25 @@ const LayerList: React.FC = () => {
     setMenuOpen(null);
   };
 
+  // 레이어 복제
+  const handleDuplicateClick = (
+    e: React.MouseEvent,
+    layer: LayerWithContents,
+  ) => {
+    e.stopPropagation();
+    if (!currentCanvas || !session) return;
+
+    // 레이어 복제 함수 호출
+    duplicateLayer(currentCanvas.id, layer.id, session).then((newLayerId) => {
+      if (newLayerId) {
+        console.log(`레이어 복제 성공: ${newLayerId}`);
+      } else {
+        console.error("레이어 복제 실패");
+      }
+    });
+
+    setMenuOpen(null);
+  };
   // 레이어 선택 처리 (다중 선택 기능 추가)
   const handleLayerSelect = (e: React.MouseEvent, layer: LayerWithContents) => {
     // Command(Mac) 또는 Control(Windows) 키가 눌려있는지 확인
@@ -322,6 +343,13 @@ const LayerList: React.FC = () => {
                     >
                       <MdOutlinePhotoSizeSelectLarge size={16} />
                       <span>크기 조정</span>
+                    </button>
+                    <button
+                      className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                      onClick={(e) => handleDuplicateClick(e, layer)}
+                    >
+                      <IoDuplicateOutline size={16} />
+                      <span>복제</span>
                     </button>
                     <button
                       className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"

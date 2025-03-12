@@ -385,6 +385,85 @@ export const deleteLayer = (canvasId: string, layerId: string) => {
   }
 };
 
+// duplicateLayer 함수 구현
+export const duplicateLayer = (
+  canvasId: string,
+  layerId: string,
+  session: Session,
+): Promise<string | null> => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return Promise.resolve(null);
+
+  const doc = getCanvasYdoc();
+  if (!doc) return Promise.resolve(null);
+
+  // 복제할 레이어 찾기
+  const layerToDuplicate = layersMap.get(layerId);
+  if (!layerToDuplicate) return Promise.resolve(null);
+
+  // 현재 레이어 상태 가져오기
+  const layers = getLayers(canvasId) || [];
+
+  // 서버에 레이어 복제 요청
+  const socket = store.get(projectSocketAtom);
+  if (!socket) return Promise.resolve(null);
+
+  // Promise로 감싸서 socket 응답을 기다리게 함
+  return new Promise((resolve) => {
+    socket.emit(
+      "duplicateLayer",
+      {
+        canvasId: canvasId,
+        layerId: layerId,
+        project: socket.id,
+        layerData: {
+          name: `${layerToDuplicate.name} 복사본`,
+          created_user_id: session.user.id,
+          updated_user_id: session.user.id,
+          index: layerToDuplicate.index + 1,
+          layer_content: layerToDuplicate.layer_content,
+        },
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("레이어 복제 실패:", response.error);
+          resolve(null);
+          return;
+        }
+
+        const newLayer = response.layer;
+
+        doc.transact(() => {
+          // 레이어 맵에 새 레이어 추가
+          layersMap.set(newLayer.id, newLayer);
+        });
+
+        // 캔버스 레이어 상태 업데이트
+        const updatedLayers = Array.from(layersMap.values()).sort(
+          (a, b) => a.index - b.index,
+        );
+
+        // 캔버스별 레이어 상태 업데이트
+        const canvasLayers = store.get(canvasLayersAtom);
+        store.set(canvasLayersAtom, {
+          ...canvasLayers,
+          [canvasId]: updatedLayers,
+        });
+
+        // 현재 선택된 캔버스와 새 레이어를 추가한 캔버스가 같은 경우
+        const selectedCanvas = store.get(currentCanvasAtom);
+        if (selectedCanvas && selectedCanvas.id === canvasId) {
+          store.set(currentLayersAtom, updatedLayers);
+          store.set(currentLayerAtom, newLayer); // 새 레이어를 선택 상태로 설정
+        }
+
+        // 실제 생성된 레이어 ID 반환
+        resolve(newLayer.id);
+      },
+    );
+  });
+};
+
 export const saveLayerContent = (
   canvasId: string,
   layerId: string,
@@ -410,7 +489,6 @@ export const saveLayerContent = (
       ...layer,
       layer_content: data,
     };
-    console.log("wjwkd");
     // 캔버스 맵에 업데이트된 캔버스 저장
     layersMap.set(layerId, updatedLayer);
   });

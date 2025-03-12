@@ -374,3 +374,136 @@ export const toggleLayerVisibility = async (
     };
   }
 };
+
+/**
+ * 레이어를 복제하는 함수
+ *
+ * @param {string} canvasId - 레이어가 속한 캔버스 ID
+ * @param {string} layerId - 복제할 원본 레이어 ID
+ * @param {Object} layerData - 복제할 레이어 데이터 (이름, 생성 사용자 ID 등)
+ * @returns {Promise<Object>} - 생성된 복제 레이어 정보와 성공 여부
+ */
+export const duplicateLayer = async (
+  canvasId: string,
+  layerId: string,
+  layerData: {
+    name: string;
+    created_user_id: string;
+    updated_user_id: string;
+    index: number;
+    layer_content?: any;
+  },
+) => {
+  try {
+    return await mongo.$transaction(async (tx) => {
+      // 원본 레이어 조회
+      const originalLayer = await tx.layer.findUnique({
+        where: {
+          id: layerId,
+        },
+        include: {
+          layer_content: true,
+        },
+      });
+
+      if (!originalLayer) {
+        return {
+          success: false,
+          error: "원본 레이어를 찾을 수 없습니다.",
+        };
+      }
+
+      // 인덱스 재정렬: 복제된 레이어 다음에 위치할 다른 레이어들의 인덱스 증가
+      await tx.layer.updateMany({
+        where: {
+          canvas_id: canvasId,
+          index: {
+            gte: layerData.index,
+          },
+        },
+        data: {
+          index: {
+            increment: 1,
+          },
+          updated_at: new Date(),
+        },
+      });
+
+      // 새 레이어 생성
+      const newLayer = await tx.layer.create({
+        data: {
+          name: layerData.name,
+          index: layerData.index,
+          type: originalLayer.type,
+          visible: originalLayer.visible,
+          opacity: originalLayer.opacity,
+          blend_mode: originalLayer.blend_mode,
+          locked: originalLayer.locked,
+          created_user_id: layerData.created_user_id,
+          updated_user_id: layerData.updated_user_id,
+          created_at: new Date(),
+          updated_at: new Date(),
+          canvas_id: canvasId,
+          parent_layer_id: originalLayer.parent_layer_id,
+        },
+      });
+
+      // 레이어 컨텐츠 복제
+      let newLayerContent = null;
+      if (originalLayer.layer_content) {
+        // 복제할 레이어 컨텐츠 데이터 준비 (타입을 명시적으로 정의)
+        const contentData: {
+          layer_id: string;
+          position_x: number;
+          position_y: number;
+          rotation: number;
+          transform: any;
+          normal_data?: any;
+          shape_data?: any;
+          text_data?: any;
+          image_data?: any;
+        } = {
+          layer_id: newLayer.id,
+          position_x: originalLayer.layer_content.position_x,
+          position_y: originalLayer.layer_content.position_y,
+          rotation: originalLayer.layer_content.rotation,
+          transform: originalLayer.layer_content.transform,
+        };
+
+        // 타입별 데이터 복제
+        if (originalLayer.layer_content.normal_data) {
+          contentData.normal_data = originalLayer.layer_content.normal_data;
+        }
+        if (originalLayer.layer_content.shape_data) {
+          contentData.shape_data = originalLayer.layer_content.shape_data;
+        }
+        if (originalLayer.layer_content.text_data) {
+          contentData.text_data = originalLayer.layer_content.text_data;
+        }
+        if (originalLayer.layer_content.image_data) {
+          contentData.image_data = originalLayer.layer_content.image_data;
+        }
+
+        // 새 레이어 컨텐츠 생성
+        newLayerContent = await tx.layerContent.create({
+          data: contentData,
+        });
+      }
+
+      // 생성된 레이어와 레이어 컨텐츠 정보 반환
+      return {
+        success: true,
+        layer: {
+          ...newLayer,
+          layer_content: newLayerContent,
+        },
+      };
+    });
+  } catch (error) {
+    console.error("레이어 복제 실패:", error);
+    return {
+      success: false,
+      error: "레이어 복제에 실패했습니다.",
+    };
+  }
+};
