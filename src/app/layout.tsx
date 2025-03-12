@@ -5,6 +5,7 @@ import AuthSession from "./AuthSession";
 import Main from "~/components/common/Main";
 import ModalPortalProvider from "~/contexts/ModalPortalContext";
 import ZoomPreventer from "~/components/common/ZoomPreventer";
+import GlobalKeyboardHandler from "~/components/common/GlobalKeyboardHandler";
 
 export const metadata: Metadata = {
   title: "Flamingo MVP",
@@ -21,6 +22,7 @@ export default function RootLayout({
         <AuthSession>
           <ModalPortalProvider>
             <ZoomPreventer />
+            <GlobalKeyboardHandler />
             <Main>{children}</Main>
           </ModalPortalProvider>
         </AuthSession>

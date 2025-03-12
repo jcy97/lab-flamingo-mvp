@@ -37,6 +37,7 @@ const LayerList: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editingLayerId && inputRef.current) {
@@ -69,6 +70,34 @@ const LayerList: React.FC = () => {
       document.removeEventListener("click", handleDocumentClick);
     };
   }, [setSelectedLayers]);
+
+  // Ctrl+D / Command+D 단축키 이벤트 처리
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+D 또는 Command+D가 눌렸을 때
+      if ((e.ctrlKey || e.metaKey) && e.key === "d") {
+        e.preventDefault(); // 브라우저 기본 동작 방지 (북마크 등)
+        console.log("123");
+        // 현재 선택된 레이어가 있을 때만 복제 기능 수행
+        if (currentLayer && currentCanvas && session) {
+          duplicateLayer(currentCanvas.id, currentLayer.id, session);
+        }
+      }
+    };
+
+    // 최상위 div에 이벤트 리스너 추가
+    const containerElement = containerRef.current;
+    if (containerElement) {
+      containerElement.addEventListener("keydown", handleKeyDown);
+    }
+
+    // 컴포넌트 언마운트 시 이벤트 리스너 제거
+    return () => {
+      if (containerElement) {
+        containerElement.removeEventListener("keydown", handleKeyDown);
+      }
+    };
+  }, [currentLayer, currentCanvas, session, selectedLayers, duplicateLayer]);
 
   const handleDragStart = (e: React.DragEvent, index: number) => {
     setDraggedItem(index);
@@ -240,7 +269,11 @@ const LayerList: React.FC = () => {
   }
 
   return (
-    <div className="layer-list-container flex h-full w-full flex-col gap-1 overflow-y-auto">
+    <div
+      ref={containerRef}
+      className="layer-list-container flex h-full w-full flex-col gap-1 overflow-y-auto"
+      tabIndex={0} // 키보드 이벤트를 받기 위해 tabIndex 추가
+    >
       {layers
         .sort((a, b) => b.index - a.index)
         .map((layer, index) => (
