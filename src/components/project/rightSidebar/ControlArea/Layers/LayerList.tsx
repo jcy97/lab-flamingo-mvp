@@ -271,7 +271,7 @@ const LayerList: React.FC = () => {
   return (
     <div
       ref={containerRef}
-      className="layer-list-container flex h-full w-full flex-col gap-1 overflow-y-auto"
+      className="layer-list-container flex h-full w-full flex-col gap-1 overflow-y-auto outline-none"
       tabIndex={0} // 키보드 이벤트를 받기 위해 tabIndex 추가
     >
       {layers
