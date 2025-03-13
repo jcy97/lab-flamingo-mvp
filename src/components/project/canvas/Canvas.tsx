@@ -10,7 +10,9 @@ import {
   canvasSelectedLayerMapAtom,
   selectedLayersAtom, // 다중 선택 레이어 atom
   showTransformerAtom,
-  LayerWithContents, // 트랜스포머 표시 상태 atom
+  LayerWithContents,
+  canvasLayersAtom,
+  editingTextLayerIdAtom, // 트랜스포머 표시 상태 atom
 } from "~/store/atoms";
 import { Stage, Layer, Rect } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
@@ -22,7 +24,14 @@ import LayerTransformer from "./Layer/LayerTransformer"; // 새로 만든 트랜
 import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 import UserMousePointers from "~/components/common/user/UserMousePointers";
-import { SizeInfo, Transform, TransformableLayer } from "~/types/types";
+import {
+  SizeInfo,
+  TextObject,
+  Transform,
+  TransformableLayer,
+} from "~/types/types";
+import TextEdit from "./Layer/TextEdit";
+import TextLayer from "./Layer/TextLayer";
 
 // Define Canvas with Layers type
 export interface CanvasWithLayers extends CanvasType {
@@ -43,7 +52,7 @@ const Canvas: React.FC = () => {
   const currentCanvas = useAtomValue(currentCanvasAtom) as
     | CanvasWithLayers
     | undefined;
-  const currentLayers = useAtomValue(currentLayersAtom) as LayerWithContents[];
+  const [currentLayers, setCurrentLayers] = useAtom(currentLayersAtom);
   const [currentLayer, setCurrentLayer] = useAtom(currentLayerAtom);
   const [selectedLayers, setSelectedLayers] = useAtom(selectedLayersAtom);
   const [showTransformer, setShowTransformer] = useAtom(showTransformerAtom);
@@ -55,6 +64,8 @@ const Canvas: React.FC = () => {
   const [canvasSelectedLayerMap, setCanvasSelectedLayerMap] = useAtom(
     canvasSelectedLayerMapAtom,
   );
+
+  const [canvasLayers, setCanvasLayers] = useAtom(canvasLayersAtom);
 
   // 캔버스 위치 상태
   const [position, setPosition] = useState<{ x: number; y: number }>({
@@ -94,6 +105,13 @@ const Canvas: React.FC = () => {
   // 노드 드래그 관련 상태
   const [isNodeDragging, setIsNodeDragging] = useState<boolean>(false);
 
+  // 텍스트 레이어 관련 상태
+  const [editingTextLayer, setEditingTextLayer] =
+    useState<LayerWithContents | null>(null);
+
+  const [editingTextLayerId, setEditingTextLayerId] = useAtom(
+    editingTextLayerIdAtom,
+  );
   // 노드 드래그 이벤트 감지
   useEffect(() => {
     if (stageRef.current) {
@@ -405,6 +423,8 @@ const Canvas: React.FC = () => {
     if (newY < -parentY / 2) {
       newY = -parentY / 2;
     }
+
+    // 위치 설정
     setPosition({
       x: newX,
       y: newY,
@@ -467,6 +487,10 @@ const Canvas: React.FC = () => {
       if (e.code === "KeyE" && !e.ctrlKey && !e.altKey && !e.metaKey) {
         setCurrentToolbarItem(ToolbarItemIDs.ERASER);
       }
+      // T 키를 눌렀을 때 텍스트 도구 선택
+      if (e.code === "KeyT" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        setCurrentToolbarItem(ToolbarItemIDs.TEXT);
+      }
 
       // Windows: Ctrl+Space, macOS: 스포트라이트 충돌 방지를 위해 Ctrl+Space로 통일
       // 임시 확대 모드 활성화
@@ -521,6 +545,55 @@ const Canvas: React.FC = () => {
       window.removeEventListener("keyup", handleKeyUp);
     };
   }, [showTransformer]);
+
+  // 텍스트 레이어 클릭 처리 함수
+  const handleTextLayerClick = (layer: LayerWithContents) => {
+    if (layer.type === "TEXT") {
+      setEditingTextLayer(layer);
+      setCurrentLayer(layer);
+      setEditingTextLayerId(layer.id);
+    }
+  };
+
+  // 텍스트 업데이트 처리 함수
+  const handleTextUpdate = (layerId: string, textObject: TextObject) => {
+    if (!currentCanvas) return;
+
+    // 레이어 콘텐츠 업데이트
+    const updatedLayers = currentLayers.map((layer) => {
+      const textData = layer.layer_content.text_data || {};
+      if (layer.id === layerId && layer.layer_content) {
+        const updatedContent = {
+          ...layer.layer_content,
+          text_data: {
+            ...(textData as Record<string, any>),
+            textObject: textObject,
+          },
+        };
+
+        // 서버에 데이터 저장
+        //saveLayerContent(currentCanvas.id, layerId, updatedContent, user!);
+
+        return {
+          ...layer,
+          layer_content: updatedContent,
+        };
+      }
+      return layer;
+    });
+
+    setCurrentLayers(updatedLayers as LayerWithContents[]);
+    setCanvasLayers({
+      ...canvasLayers,
+      [currentCanvas.id]: updatedLayers as LayerWithContents[],
+    });
+  };
+
+  // 텍스트 편집 종료 함수
+  const handleFinishTextEditing = () => {
+    setEditingTextLayer(null);
+    setEditingTextLayerId(null);
+  };
 
   // 컴포넌트 마운트 시 초기화
   useEffect(() => {
@@ -591,7 +664,101 @@ const Canvas: React.FC = () => {
 
     // 브러시 도구 선택 시
     if (currentToolbarItem === ToolbarItemIDs.BRUSH) return "crosshair";
+    if (currentToolbarItem === ToolbarItemIDs.TEXT) return "text";
     return "default";
+  };
+
+  const handleStageClick = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (e.target instanceof Konva.Text) {
+      const layerId = e.target.id();
+      const textLayer = currentLayers.find(
+        (layer) => layer.id === layerId && layer.type === "TEXT",
+      );
+      if (textLayer) {
+        handleTextLayerClick(textLayer);
+        return;
+      }
+    }
+
+    // Stage를 클릭한 경우 (텍스트 객체가 아닌 빈 공간)
+    if (e.target === e.target.getStage()) {
+      if (editingTextLayer) {
+        setEditingTextLayer(null);
+      }
+
+      const stage = e.target;
+      const pointerPosition = stage.getPointerPosition();
+
+      //Text 처리
+      if (
+        currentToolbarItem === ToolbarItemIDs.TEXT &&
+        currentLayer?.type !== "TEXT" &&
+        pointerPosition
+      ) {
+        // 스케일을 고려한 실제 캔버스 내 좌표로 변환
+        // stage.getAbsoluteTransform()은 현재 스테이지의 모든 변환(스케일, 이동 등)을 포함
+        // invert()를 호출하여 역변환을 얻음
+        const transform = stage.getAbsoluteTransform().copy().invert();
+        const actualPosition = transform.point(pointerPosition);
+
+        const newText: TextObject = {
+          id: Date.now().toString(),
+          x: actualPosition.x, // 변환된 x 좌표 사용
+          y: actualPosition.y, // 변환된 y 좌표 사용
+          text: "텍스트",
+          fontSize: 16,
+          fontFamily: "Arial",
+        };
+
+        const layerContent: LayerContent = {
+          id: "123123123123",
+          layer_id: "122131241209421094019204",
+          position_x: 1,
+          position_y: 0,
+          rotation: 0,
+          transform: {
+            x: actualPosition.x, // 변환된 x 좌표 사용
+            y: actualPosition.y, // 변환된 y 좌표 사용
+          },
+          normal_data: {},
+          text_data: {
+            textObject: newText,
+          } as Record<string, any>,
+          shape_data: {},
+          image_data: {},
+        };
+
+        const newLayer: LayerWithContents = {
+          name: "텍스트",
+          type: "TEXT",
+          index: 2,
+          id: "122131241209421094019204",
+          visible: true,
+          opacity: 1.0,
+          blend_mode: "NORMAL",
+          locked: false,
+          created_at: new Date(),
+          created_user_id: "111",
+          updated_at: new Date(),
+          updated_user_id: "111",
+          canvas_id: currentCanvas.id,
+          parent_layer_id: null,
+          layer_content: layerContent,
+        };
+
+        const updatedLayers = [...currentLayers, newLayer];
+        setCurrentLayers(updatedLayers);
+
+        setCanvasLayers({
+          ...canvasLayers,
+          [currentCanvas.id]: updatedLayers,
+        });
+        setCurrentLayer(newLayer);
+
+        setEditingTextLayer(newLayer);
+        setEditingTextLayerId(newLayer.id);
+      }
+    }
   };
 
   return (
@@ -652,6 +819,7 @@ const Canvas: React.FC = () => {
             scaleY={scaleFactor}
             onMouseDown={(e) => e.evt.preventDefault()}
             onTouchStart={(e) => e.evt.preventDefault()}
+            onClick={handleStageClick}
           >
             {/* 레이어 순서대로 렌더링 (인덱스 낮은 것부터) */}
             {currentLayers &&
@@ -685,6 +853,21 @@ const Canvas: React.FC = () => {
                         />
                       </Layer>
                     );
+                  } else if (layer.type === "TEXT" && layer.layer_content) {
+                    return (
+                      <Layer
+                        key={`layer-${layer.id}`}
+                        visible={layer.visible}
+                        imageSmoothingEnabled={true}
+                        opacity={layer.opacity || 1}
+                      >
+                        <TextLayer
+                          layer={layer}
+                          stageRef={stageRef}
+                          isSelected={layer.id === selectedLayerId}
+                        />
+                      </Layer>
+                    );
                   }
                   return null;
                 })}
@@ -702,6 +885,33 @@ const Canvas: React.FC = () => {
               </Layer>
             )}
           </Stage>
+          {/* Canvas return 내부, Stage 바로 다음에 추가 */}
+          {editingTextLayer && (
+            <TextEdit
+              layer={editingTextLayer}
+              stageRef={stageRef}
+              scale={scaleFactor}
+              isActive={!!editingTextLayer}
+              position={position} // 캔버스 위치 전달
+              onTextChange={(newText) => {
+                if (
+                  editingTextLayer &&
+                  editingTextLayer.layer_content?.text_data
+                ) {
+                  const textObj = (
+                    editingTextLayer.layer_content.text_data as any
+                  ).textObject;
+                  if (textObj) {
+                    handleTextUpdate(editingTextLayer.id, {
+                      ...textObj,
+                      text: newText,
+                    });
+                  }
+                }
+              }}
+              onFinishEditing={handleFinishTextEditing}
+            />
+          )}
         </div>
       </div>
     </div>

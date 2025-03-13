@@ -123,3 +123,6 @@ export const showTransformerAtom = atom<boolean>(false);
 export const currentFocusAreaAtom = atom<string>(FOCUS_AREA.DRAWING);
 
 export const canvasObservingAtom = atom<boolean>(false);
+
+//텍스트 레이어 관리
+export const editingTextLayerIdAtom = atom<string | null>(null);

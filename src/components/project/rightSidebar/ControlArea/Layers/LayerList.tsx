@@ -77,7 +77,6 @@ const LayerList: React.FC = () => {
       // Ctrl+D 또는 Command+D가 눌렸을 때
       if ((e.ctrlKey || e.metaKey) && e.key === "d") {
         e.preventDefault(); // 브라우저 기본 동작 방지 (북마크 등)
-        console.log("123");
         // 현재 선택된 레이어가 있을 때만 복제 기능 수행
         if (currentLayer && currentCanvas && session) {
           duplicateLayer(currentCanvas.id, currentLayer.id, session);

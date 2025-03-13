@@ -110,3 +110,15 @@ export interface Transform {
   scaleX: number;
   scaleY: number;
 }
+
+// Text 객체 인터페이스 정의
+export interface TextObject {
+  id: string;
+  x: number;
+  y: number;
+  text: string;
+  fill?: string;
+  color?: string;
+  fontSize: number;
+  fontFamily: string;
+}
