@@ -23,13 +23,15 @@ const TextEdit: React.FC<TextEditProps> = ({
   onFinishEditing,
 }) => {
   const [textValue, setTextValue] = useState<string>("");
-  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [inputPosition, setInputPosition] = useState({ top: 0, left: 0 });
   const [inputWidth, setInputWidth] = useState<number>(100);
+  const [inputHeight, setInputHeight] = useState<number>(20);
 
   // 텍스트 객체 데이터 가져오기
-  const textObject = (layer.layer_content.text_data as Record<string, any>)
-    .textObject;
+  const textObject = layer.layer_content?.text_data
+    ? (layer.layer_content.text_data as Record<string, any>).textObject
+    : null;
 
   // 텍스트 너비 계산 함수
   const calculateTextWidth = (
@@ -41,16 +43,48 @@ const TextEdit: React.FC<TextEditProps> = ({
     const context = canvas.getContext("2d");
     if (context) {
       context.font = `${fontSize}px ${fontFamily}`;
-      return context.measureText(text).width;
+
+      // 줄바꿈이 있는 경우 각 줄의 최대 너비 계산
+      const lines = text.split("\n");
+      let maxWidth = 0;
+
+      lines.forEach((line) => {
+        const lineWidth = context.measureText(line).width;
+        maxWidth = Math.max(maxWidth, lineWidth);
+      });
+
+      return maxWidth;
     }
     return text.length * fontSize * 0.6; // 대략적인 너비 계산
   };
 
-  // 텍스트 값이 변경될 때마다 너비 업데이트
+  // 텍스트 높이 계산 함수
+  const calculateTextHeight = (
+    text: string,
+    fontSize: number,
+    lineHeight: number = 1.2,
+  ): number => {
+    // 줄 수 계산
+    const lines = text.split("\n").length;
+    // 줄 높이 (폰트 크기 * 줄 높이 비율)
+    const lineHeightPx = fontSize * lineHeight;
+
+    return Math.max(fontSize, lines * lineHeightPx);
+  };
+
+  // 레이어 변경 시 텍스트값 업데이트
+  useEffect(() => {
+    if (textObject && isActive) {
+      setTextValue(textObject.text || "");
+    }
+  }, [textObject, isActive, layer]); // layer 의존성 추가
+
+  // 텍스트값이 변경될 때마다 너비와 높이 업데이트
   useEffect(() => {
     if (textObject) {
       const fontSize = textObject.fontSize || 16;
       const fontFamily = textObject.fontFamily || "Arial";
+      const lineHeight = textObject.lineHeight || 1.2;
 
       // 텍스트 길이에 따른 너비 계산 (최소 100px)
       const calculatedWidth = Math.max(
@@ -58,11 +92,27 @@ const TextEdit: React.FC<TextEditProps> = ({
         calculateTextWidth(textValue, fontSize, fontFamily) + 20, // 약간의 여유 공간 추가
       );
 
+      // 텍스트 높이 계산 (줄 간격 적용)
+      const calculatedHeight = calculateTextHeight(
+        textValue,
+        fontSize,
+        lineHeight,
+      );
+
       setInputWidth(calculatedWidth);
+      setInputHeight(calculatedHeight);
     }
   }, [textValue, textObject]);
 
-  // 텍스트 레이어가 활성화되면 해당 위치에 input 배치
+  // textarea 높이 자동 조절 함수
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  // 텍스트 레이어가 활성화되면 해당 위치에 textarea 배치
   useEffect(() => {
     if (isActive && textObject && stageRef.current) {
       const stage = stageRef.current;
@@ -88,7 +138,7 @@ const TextEdit: React.FC<TextEditProps> = ({
           // DOM 위치 설정
           setInputPosition({
             left: absolutePos.x,
-            top: absolutePos.y - 10,
+            top: absolutePos.y + 1,
           });
         } catch (e) {
           console.error("변환 중 오류:", e);
@@ -111,24 +161,33 @@ const TextEdit: React.FC<TextEditProps> = ({
 
         // 텍스트 값 설정
         if (textObject) {
-          setTextValue(textObject.text);
+          setTextValue(textObject.text || "");
 
-          // 초기 너비 설정
+          // 초기 너비와 높이 설정
           const fontSize = textObject.fontSize || 16;
           const fontFamily = textObject.fontFamily || "Arial";
+          const lineHeight = textObject.lineHeight || 1.2;
           const initialWidth = Math.max(
             100,
-            calculateTextWidth(textObject.text, fontSize, fontFamily) + 20,
+            calculateTextWidth(textObject.text || "", fontSize, fontFamily) +
+              20,
           );
+          const initialHeight = calculateTextHeight(
+            textObject.text || "",
+            fontSize,
+            lineHeight,
+          );
+
           setInputWidth(initialWidth);
+          setInputHeight(initialHeight);
         }
 
         // 입력 포커싱
-        if (inputRef.current) {
+        if (textareaRef.current) {
           setTimeout(() => {
-            if (inputRef.current) {
-              inputRef.current.focus();
-              inputRef.current.select();
+            if (textareaRef.current) {
+              textareaRef.current.focus();
+              adjustTextareaHeight();
             }
           }, 10);
         }
@@ -137,15 +196,18 @@ const TextEdit: React.FC<TextEditProps> = ({
   }, [isActive, layer, stageRef, textObject, scale, position]);
 
   // 입력 처리 함수
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newValue = e.target.value;
     setTextValue(newValue);
     onTextChange(newValue);
+    adjustTextareaHeight();
   };
 
-  // 입력 완료 처리 (Enter 키나 포커스 잃을 때)
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
+  // 입력 완료 처리
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Shift + Enter는 줄바꿈, Enter만 누르면 편집 완료
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
       onFinishEditing();
     }
     if (e.key === "Escape") {
@@ -155,12 +217,13 @@ const TextEdit: React.FC<TextEditProps> = ({
 
   // 컴포넌트가 마운트될 때와 isActive가 바뀔 때 포커스 설정
   useEffect(() => {
-    if (isActive && inputRef.current) {
-      inputRef.current.focus();
+    if (isActive && textareaRef.current) {
+      textareaRef.current.focus();
+      adjustTextareaHeight();
     }
   }, [isActive]);
 
-  if (!isActive) return null;
+  if (!isActive || !textObject) return null;
 
   return (
     <div
@@ -171,21 +234,27 @@ const TextEdit: React.FC<TextEditProps> = ({
         zIndex: 1000,
       }}
     >
-      <input
-        ref={inputRef}
-        type="text"
+      <textarea
+        ref={textareaRef}
         value={textValue}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         onBlur={onFinishEditing}
-        className="border-none bg-transparent outline-none"
+        spellCheck="false"
+        className="resize-none overflow-hidden border-none bg-transparent outline-none"
         style={{
-          fontFamily: textObject?.fontFamily || "Arial",
-          fontSize: `${(textObject?.fontSize || 16) * scale}px`, // 스케일 적용
-          color: textObject?.fill || "#000000",
+          fontFamily: textObject.fontFamily || "Arial",
+          fontSize: `${(textObject.fontSize || 16) * scale}px`, // 스케일 적용
+          fontWeight: textObject.fontWeight || "normal", // 폰트 굵기 적용
+          fontStyle: textObject.fontStyle || "normal", // 폰트 스타일 적용
+          color: textObject.fill || "#000000",
           width: `${inputWidth * scale}px`, // 스케일 적용
           minWidth: `${100 * scale}px`, // 스케일 적용
+          minHeight: `${(textObject.fontSize || 16) * (textObject.lineHeight || 1.2) * scale}px`, // 줄 간격 고려한 최소 높이
+          lineHeight: String(textObject.lineHeight || 1.2), // 줄 높이 비율 설정
+          textAlign: textObject.align || "left", // 텍스트 정렬 적용
           transformOrigin: "top left",
+          padding: "0",
         }}
       />
     </div>

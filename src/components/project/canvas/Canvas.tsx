@@ -676,6 +676,7 @@ const Canvas: React.FC = () => {
       );
       if (textLayer) {
         handleTextLayerClick(textLayer);
+        setCurrentToolbarItem(ToolbarItemIDs.TEXT);
         return;
       }
     }
@@ -759,6 +760,50 @@ const Canvas: React.FC = () => {
         setEditingTextLayerId(newLayer.id);
       }
     }
+  };
+
+  const handleTextPropertiesChange = (
+    layerId: string,
+    propertyUpdate: Partial<TextObject>,
+  ) => {
+    if (!currentCanvas) return;
+
+    // 레이어 콘텐츠 업데이트
+    const updatedLayers = currentLayers.map((layer) => {
+      if (layer.id === layerId && layer.layer_content) {
+        const textData = layer.layer_content.text_data || {};
+        const textObject = (textData as Record<string, any>).textObject || {};
+
+        // 텍스트 객체 업데이트
+        const updatedTextObject = {
+          ...textObject,
+          ...propertyUpdate,
+        };
+
+        const updatedContent = {
+          ...layer.layer_content,
+          text_data: {
+            ...(textData as Record<string, any>),
+            textObject: updatedTextObject,
+          },
+        };
+
+        // 서버에 데이터 저장 (선택적)
+        // saveLayerContent(currentCanvas.id, layerId, updatedContent, user!);
+
+        return {
+          ...layer,
+          layer_content: updatedContent,
+        };
+      }
+      return layer;
+    });
+
+    setCurrentLayers(updatedLayers as LayerWithContents[]);
+    setCanvasLayers({
+      ...canvasLayers,
+      [currentCanvas.id]: updatedLayers as LayerWithContents[],
+    });
   };
 
   return (

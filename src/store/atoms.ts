@@ -126,3 +126,15 @@ export const canvasObservingAtom = atom<boolean>(false);
 
 //텍스트 레이어 관리
 export const editingTextLayerIdAtom = atom<string | null>(null);
+
+// 텍스트 속성을 위한 atom 정의
+export const textPropertiesAtom = atom({
+  fontFamily: "Arial",
+  fontSize: 16,
+  fill: "#000000",
+  align: "left",
+  fontWeight: "normal",
+  fontStyle: "normal",
+  lineHeight: 1.2,
+  width: undefined as number | undefined,
+});

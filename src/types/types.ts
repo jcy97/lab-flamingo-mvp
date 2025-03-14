@@ -121,4 +121,9 @@ export interface TextObject {
   color?: string;
   fontSize: number;
   fontFamily: string;
+  width?: number;
+  align?: string;
+  fontWeight?: string;
+  fontStyle?: string;
+  lineHeight?: number;
 }
