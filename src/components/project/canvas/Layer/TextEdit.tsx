@@ -258,7 +258,7 @@ const TextEdit: React.FC<TextEditProps> = ({
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
         spellCheck="false"
-        className="resize-none overflow-hidden border-none bg-transparent outline-none"
+        className="resize-none overflow-hidden border-2 border-primary-500 bg-transparent outline-none"
         style={{
           fontFamily: textObject.fontFamily || "Arial",
           fontSize: `${(textObject.fontSize || 16) * scale}px`, // 스케일 적용

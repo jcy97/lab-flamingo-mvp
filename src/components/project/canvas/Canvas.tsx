@@ -12,7 +12,8 @@ import {
   showTransformerAtom,
   LayerWithContents,
   canvasLayersAtom,
-  editingTextLayerIdAtom, // 트랜스포머 표시 상태 atom
+  editingTextLayerIdAtom,
+  editingTextLayerAtom, // 트랜스포머 표시 상태 atom
 } from "~/store/atoms";
 import { Stage, Layer, Rect } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
@@ -106,8 +107,7 @@ const Canvas: React.FC = () => {
   const [isNodeDragging, setIsNodeDragging] = useState<boolean>(false);
 
   // 텍스트 레이어 관련 상태
-  const [editingTextLayer, setEditingTextLayer] =
-    useState<LayerWithContents | null>(null);
+  const [editingTextLayer, setEditingTextLayer] = useAtom(editingTextLayerAtom);
 
   const [editingTextLayerId, setEditingTextLayerId] = useAtom(
     editingTextLayerIdAtom,
@@ -458,7 +458,19 @@ const Canvas: React.FC = () => {
       if (e.ctrlKey && e.code === "KeyT") {
         e.preventDefault(); // 기본 동작 방지
         e.stopPropagation(); // 버블링 방지
-        toggleTransformer();
+        setCurrentToolbarItem(ToolbarItemIDs.SELECT);
+        // 텍스트 편집 중인 경우, 편집 모드를 종료하고 트랜스포머를 활성화
+        if (currentLayer?.type === "TEXT" && editingTextLayer !== null) {
+          setEditingTextLayer(null);
+          setEditingTextLayerId(null);
+          // 트랜스포머가 꺼져있으면 켜기만 하고, 켜져있으면 상태 유지
+          if (!showTransformer) {
+            setShowTransformer(true);
+          }
+        } else {
+          // 텍스트 편집 중이 아닌 경우 일반적인 토글 동작
+          toggleTransformer();
+        }
         return;
       }
 
@@ -705,10 +717,6 @@ const Canvas: React.FC = () => {
 
     // Stage를 클릭한 경우 (텍스트 객체가 아닌 빈 공간)
     if (e.target === e.target.getStage()) {
-      if (editingTextLayer) {
-        setEditingTextLayer(null);
-      }
-
       const stage = e.target;
       const pointerPosition = stage.getPointerPosition();
 
@@ -726,10 +734,7 @@ const Canvas: React.FC = () => {
           user!,
         ).then((layer) => {
           if (layer) {
-            console.log("텍스트 레이어 생성됨:", layer);
-            console.log("텍스트 데이터:", layer.layer_content?.text_data);
             setEditingTextLayer(layer);
-            console.log("편집 모드 활성화:", layer.id);
           }
         });
       }
@@ -896,7 +901,6 @@ const Canvas: React.FC = () => {
                       updatedContent,
                       user,
                     );
-                    console.log("텍스트 레이어 저장:", layerId);
                   }
                 }
               }}

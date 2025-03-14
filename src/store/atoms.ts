@@ -138,3 +138,5 @@ export const textPropertiesAtom = atom({
   lineHeight: 1.2,
   width: undefined as number | undefined,
 });
+
+export const editingTextLayerAtom = atom<LayerWithContents | null>(null);

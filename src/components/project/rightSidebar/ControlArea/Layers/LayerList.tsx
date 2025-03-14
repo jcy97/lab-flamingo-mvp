@@ -5,11 +5,14 @@ import { HiOutlineAdjustments } from "react-icons/hi";
 import { BiRename, BiTrash } from "react-icons/bi";
 import { IoDuplicateOutline } from "react-icons/io5";
 import { MdOutlinePhotoSizeSelectLarge } from "react-icons/md";
-import { useAtom, useAtomValue } from "jotai";
+import { MdTextFields } from "react-icons/md"; // Added text icon import
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
+  editingTextLayerAtom,
+  editingTextLayerIdAtom,
   LayerWithContents,
   selectedLayersAtom,
   showTransformerAtom,
@@ -38,6 +41,8 @@ const LayerList: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const setEditingTextLayer = useSetAtom(editingTextLayerAtom);
+  const setEditingTextLayerId = useSetAtom(editingTextLayerIdAtom);
 
   useEffect(() => {
     if (editingLayerId && inputRef.current) {
@@ -223,6 +228,11 @@ const LayerList: React.FC = () => {
     // Command(Mac) 또는 Control(Windows) 키가 눌려있는지 확인
     const isMultiSelectKeyPressed = e.metaKey || e.ctrlKey;
 
+    if (layer.type === "TEXT") {
+      setEditingTextLayer(layer);
+      setEditingTextLayerId(layer.id);
+    }
+
     if (isMultiSelectKeyPressed) {
       // 이미 선택된 레이어인지 확인
       const isAlreadySelected = selectedLayers.some(
@@ -311,7 +321,11 @@ const LayerList: React.FC = () => {
               )}
             </div>
             <div className="flex flex-1 items-center gap-2 overflow-hidden px-3 py-2">
-              <div className="h-[40px] w-[45px] flex-shrink-0 bg-neutral-100"></div>
+              <div className="flex h-[40px] w-[45px] flex-shrink-0 items-center justify-center bg-neutral-100">
+                {layer.type === "TEXT" && (
+                  <MdTextFields size={24} className="text-neutral-700" />
+                )}
+              </div>
               {editingLayerId === layer.id ? (
                 <input
                   ref={inputRef}
