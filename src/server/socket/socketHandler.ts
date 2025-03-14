@@ -19,6 +19,7 @@ import {
 } from "../service/canvas";
 import {
   createLayer,
+  createTextLayer,
   deleteLayer,
   duplicateLayer,
   reorderLayers,
@@ -352,6 +353,25 @@ export const projectSocketHandler = (io: Server) => {
         callback({
           success: false,
           error: "레이어 생성에 실패했습니다.",
+        });
+      }
+    });
+
+    // 텍스트 레이어 생성 이벤트 핸들러 추가
+    socket.on("createTextLayer", async (data, callback) => {
+      try {
+        const { canvasId, project, layerData, position } = data;
+
+        // 새 텍스트 레이어 생성 작업을 수행
+        const result = await createTextLayer(canvasId, layerData, position);
+
+        // 콜백으로 결과 반환
+        callback(result);
+      } catch (error) {
+        console.error("텍스트 레이어 생성 실패:", error);
+        callback({
+          success: false,
+          error: "텍스트 레이어 생성에 실패했습니다.",
         });
       }
     });

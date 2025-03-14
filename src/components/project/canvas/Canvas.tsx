@@ -21,7 +21,7 @@ import Konva from "konva";
 import Brush from "./Layer/Brush"; // 수정된 Brush 컴포넌트
 import BrushCursor from "./Layer/BurshCurosr";
 import LayerTransformer from "./Layer/LayerTransformer"; // 새로 만든 트랜스포머 컴포넌트
-import { saveLayerContent } from "~/app/actions/yjs/layerYjs";
+import { addTextLayer, saveLayerContent } from "~/app/actions/yjs/layerYjs";
 import { useSession } from "next-auth/react";
 import UserMousePointers from "~/components/common/user/UserMousePointers";
 import {
@@ -559,27 +559,28 @@ const Canvas: React.FC = () => {
   const handleTextUpdate = (layerId: string, textObject: TextObject) => {
     if (!currentCanvas) return;
 
+    const layer = currentLayers.find((l) => l.id === layerId);
+    if (!layer || !layer.layer_content) return;
+
     // 레이어 콘텐츠 업데이트
-    const updatedLayers = currentLayers.map((layer) => {
-      const textData = layer.layer_content.text_data || {};
-      if (layer.id === layerId && layer.layer_content) {
-        const updatedContent = {
-          ...layer.layer_content,
-          text_data: {
-            ...(textData as Record<string, any>),
-            textObject: textObject,
-          },
-        };
+    const textData = layer.layer_content.text_data || {};
+    const updatedContent = {
+      ...layer.layer_content,
+      text_data: {
+        ...(textData as Record<string, any>),
+        textObject: textObject,
+      } as Record<string, any>, // JsonValue 호환되도록 타입 캐스팅
+    };
 
-        // 서버에 데이터 저장
-        //saveLayerContent(currentCanvas.id, layerId, updatedContent, user!);
-
+    // 로컬 상태 업데이트
+    const updatedLayers = currentLayers.map((l) => {
+      if (l.id === layerId) {
         return {
-          ...layer,
+          ...l,
           layer_content: updatedContent,
         };
       }
-      return layer;
+      return l;
     });
 
     setCurrentLayers(updatedLayers as LayerWithContents[]);
@@ -587,10 +588,31 @@ const Canvas: React.FC = () => {
       ...canvasLayers,
       [currentCanvas.id]: updatedLayers as LayerWithContents[],
     });
+
+    return updatedContent; // 업데이트된 콘텐츠 반환 (서버 저장용)
   };
 
   // 텍스트 편집 종료 함수
   const handleFinishTextEditing = () => {
+    if (editingTextLayer && currentCanvas && user) {
+      const layer = currentLayers.find((l) => l.id === editingTextLayer.id);
+      if (layer && layer.layer_content) {
+        // 타입 호환성을 위한 캐스팅 추가
+        const layerContent = {
+          ...layer.layer_content,
+          // 모든 JSON 필드를 명시적으로 Record<string, any>로 캐스팅
+          normal_data: layer.layer_content.normal_data as Record<string, any>,
+          shape_data: layer.layer_content.shape_data as Record<string, any>,
+          text_data: layer.layer_content.text_data as Record<string, any>,
+          image_data: layer.layer_content.image_data as Record<string, any>,
+        };
+
+        // 서버에 최종 데이터 저장
+        saveLayerContent(currentCanvas.id, layer.id, layerContent, user);
+        console.log("텍스트 레이어 서버 저장:", layer.id);
+      }
+    }
+
     setEditingTextLayer(null);
     setEditingTextLayerId(null);
   };
@@ -696,114 +718,22 @@ const Canvas: React.FC = () => {
         currentLayer?.type !== "TEXT" &&
         pointerPosition
       ) {
-        // 스케일을 고려한 실제 캔버스 내 좌표로 변환
-        // stage.getAbsoluteTransform()은 현재 스테이지의 모든 변환(스케일, 이동 등)을 포함
-        // invert()를 호출하여 역변환을 얻음
         const transform = stage.getAbsoluteTransform().copy().invert();
         const actualPosition = transform.point(pointerPosition);
-
-        const newText: TextObject = {
-          id: Date.now().toString(),
-          x: actualPosition.x, // 변환된 x 좌표 사용
-          y: actualPosition.y, // 변환된 y 좌표 사용
-          text: "텍스트",
-          fontSize: 16,
-          fontFamily: "Arial",
-        };
-
-        const layerContent: LayerContent = {
-          id: "123123123123",
-          layer_id: "122131241209421094019204",
-          position_x: 1,
-          position_y: 0,
-          rotation: 0,
-          transform: {
-            x: actualPosition.x, // 변환된 x 좌표 사용
-            y: actualPosition.y, // 변환된 y 좌표 사용
-          },
-          normal_data: {},
-          text_data: {
-            textObject: newText,
-          } as Record<string, any>,
-          shape_data: {},
-          image_data: {},
-        };
-
-        const newLayer: LayerWithContents = {
-          name: "텍스트",
-          type: "TEXT",
-          index: 2,
-          id: "122131241209421094019204",
-          visible: true,
-          opacity: 1.0,
-          blend_mode: "NORMAL",
-          locked: false,
-          created_at: new Date(),
-          created_user_id: "111",
-          updated_at: new Date(),
-          updated_user_id: "111",
-          canvas_id: currentCanvas.id,
-          parent_layer_id: null,
-          layer_content: layerContent,
-        };
-
-        const updatedLayers = [...currentLayers, newLayer];
-        setCurrentLayers(updatedLayers);
-
-        setCanvasLayers({
-          ...canvasLayers,
-          [currentCanvas.id]: updatedLayers,
+        addTextLayer(
+          currentCanvas.id,
+          { x: actualPosition.x, y: actualPosition.y },
+          user!,
+        ).then((layer) => {
+          if (layer) {
+            console.log("텍스트 레이어 생성됨:", layer);
+            console.log("텍스트 데이터:", layer.layer_content?.text_data);
+            setEditingTextLayer(layer);
+            console.log("편집 모드 활성화:", layer.id);
+          }
         });
-        setCurrentLayer(newLayer);
-
-        setEditingTextLayer(newLayer);
-        setEditingTextLayerId(newLayer.id);
       }
     }
-  };
-
-  const handleTextPropertiesChange = (
-    layerId: string,
-    propertyUpdate: Partial<TextObject>,
-  ) => {
-    if (!currentCanvas) return;
-
-    // 레이어 콘텐츠 업데이트
-    const updatedLayers = currentLayers.map((layer) => {
-      if (layer.id === layerId && layer.layer_content) {
-        const textData = layer.layer_content.text_data || {};
-        const textObject = (textData as Record<string, any>).textObject || {};
-
-        // 텍스트 객체 업데이트
-        const updatedTextObject = {
-          ...textObject,
-          ...propertyUpdate,
-        };
-
-        const updatedContent = {
-          ...layer.layer_content,
-          text_data: {
-            ...(textData as Record<string, any>),
-            textObject: updatedTextObject,
-          },
-        };
-
-        // 서버에 데이터 저장 (선택적)
-        // saveLayerContent(currentCanvas.id, layerId, updatedContent, user!);
-
-        return {
-          ...layer,
-          layer_content: updatedContent,
-        };
-      }
-      return layer;
-    });
-
-    setCurrentLayers(updatedLayers as LayerWithContents[]);
-    setCanvasLayers({
-      ...canvasLayers,
-      [currentCanvas.id]: updatedLayers as LayerWithContents[],
-    });
   };
 
   return (
@@ -951,6 +881,22 @@ const Canvas: React.FC = () => {
                       ...textObj,
                       text: newText,
                     });
+                  }
+                }
+              }}
+              onSave={(layerId, textObject) => {
+                if (currentCanvas && user) {
+                  // 업데이트된 콘텐츠 가져오기
+                  const updatedContent = handleTextUpdate(layerId, textObject);
+                  if (updatedContent) {
+                    // 서버에 저장
+                    saveLayerContent(
+                      currentCanvas.id,
+                      layerId,
+                      updatedContent,
+                      user,
+                    );
+                    console.log("텍스트 레이어 저장:", layerId);
                   }
                 }
               }}

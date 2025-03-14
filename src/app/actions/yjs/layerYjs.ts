@@ -8,6 +8,7 @@ import {
   currentCanvasAtom,
   currentLayerAtom,
   currentLayersAtom,
+  editingTextLayerIdAtom,
   LayerWithContents,
   pageCanvasesAtom,
 } from "~/store/atoms";
@@ -548,4 +549,77 @@ export const toggleLayerVisibility = (
       updatedBy: session.user.id,
     });
   }
+};
+
+export const addTextLayer = (
+  canvasId: string,
+  position: { x: number; y: number },
+  session: Session,
+): Promise<LayerWithContents | null> => {
+  const layersMap = getLayersMap(canvasId);
+  if (!layersMap) return Promise.resolve(null);
+
+  const doc = getCanvasYdoc();
+  if (!doc) return Promise.resolve(null);
+
+  // 현재 레이어 상태 가져오기
+  const layers = getLayers(canvasId) || [];
+
+  // 서버에 텍스트 레이어 생성 요청
+  const socket = store.get(projectSocketAtom);
+  if (!socket) return Promise.resolve(null);
+
+  // Promise로 감싸서 socket 응답을 기다리게 함
+  return new Promise((resolve) => {
+    socket.emit(
+      "createTextLayer", // 새로운 이벤트 명
+      {
+        canvasId: canvasId,
+        project: socket.id,
+        layerData: {
+          name: `텍스트 ${layers.length + 1}`,
+          created_user_id: session.user.id,
+          updated_user_id: session.user.id,
+        },
+        position: position, // 위치 정보 추가
+      },
+      (response: any) => {
+        if (!response.success) {
+          console.error("텍스트 레이어 생성 실패:", response.error);
+          resolve(null);
+          return;
+        }
+
+        const newLayer = response.layer;
+
+        doc.transact(() => {
+          // 레이어 맵에 새 레이어 추가
+          layersMap.set(newLayer.id, newLayer);
+        });
+
+        // 캔버스 레이어 상태 업데이트
+        const updatedLayers = Array.from(layersMap.values()).sort(
+          (a, b) => a.index - b.index,
+        );
+
+        // 캔버스별 레이어 상태 업데이트
+        const canvasLayers = store.get(canvasLayersAtom);
+        store.set(canvasLayersAtom, {
+          ...canvasLayers,
+          [canvasId]: updatedLayers,
+        });
+
+        // 현재 선택된 캔버스와 새 레이어를 추가한 캔버스가 같은 경우
+        const selectedCanvas = store.get(currentCanvasAtom);
+        if (selectedCanvas && selectedCanvas.id === canvasId) {
+          store.set(currentLayersAtom, updatedLayers);
+          store.set(currentLayerAtom, newLayer); // 새 레이어를 선택 상태로 설정
+          store.set(editingTextLayerIdAtom, newLayer.id);
+        }
+
+        // 실제 생성된 레이어 반환
+        resolve(newLayer);
+      },
+    );
+  });
 };

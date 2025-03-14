@@ -11,6 +11,7 @@ interface TextEditProps {
   position: { x: number; y: number }; // 캔버스 위치
   onTextChange: (newText: string) => void;
   onFinishEditing: () => void;
+  onSave?: (layerId: string, textObject: TextObject) => void;
 }
 
 const TextEdit: React.FC<TextEditProps> = ({
@@ -21,6 +22,7 @@ const TextEdit: React.FC<TextEditProps> = ({
   position,
   onTextChange,
   onFinishEditing,
+  onSave,
 }) => {
   const [textValue, setTextValue] = useState<string>("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -32,7 +34,6 @@ const TextEdit: React.FC<TextEditProps> = ({
   const textObject = layer.layer_content?.text_data
     ? (layer.layer_content.text_data as Record<string, any>).textObject
     : null;
-
   // 텍스트 너비 계산 함수
   const calculateTextWidth = (
     text: string,
@@ -137,8 +138,8 @@ const TextEdit: React.FC<TextEditProps> = ({
 
           // DOM 위치 설정
           setInputPosition({
-            left: absolutePos.x,
-            top: absolutePos.y + 1,
+            left: absolutePos.x + 0.2,
+            top: absolutePos.y - 1,
           });
         } catch (e) {
           console.error("변환 중 오류:", e);
@@ -155,7 +156,7 @@ const TextEdit: React.FC<TextEditProps> = ({
           // 최종 위치
           setInputPosition({
             left: scaledX + position.x,
-            top: scaledY + position.y - 4,
+            top: scaledY + position.y,
           });
         }
 
@@ -208,13 +209,29 @@ const TextEdit: React.FC<TextEditProps> = ({
     // Shift + Enter는 줄바꿈, Enter만 누르면 편집 완료
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onFinishEditing();
+      saveAndFinish();
     }
     if (e.key === "Escape") {
-      onFinishEditing();
+      saveAndFinish();
     }
   };
 
+  const handleBlur = () => {
+    saveAndFinish();
+  };
+
+  const saveAndFinish = () => {
+    if (onSave && textObject) {
+      // 현재 텍스트 값으로 textObject 업데이트
+      const updatedTextObject = {
+        ...textObject,
+        text: textValue,
+      };
+      // 저장 콜백 호출
+      onSave(layer.id, updatedTextObject);
+    }
+    onFinishEditing();
+  };
   // 컴포넌트가 마운트될 때와 isActive가 바뀔 때 포커스 설정
   useEffect(() => {
     if (isActive && textareaRef.current) {
@@ -237,9 +254,9 @@ const TextEdit: React.FC<TextEditProps> = ({
       <textarea
         ref={textareaRef}
         value={textValue}
+        onBlur={handleBlur}
         onChange={handleInputChange}
         onKeyDown={handleKeyDown}
-        onBlur={onFinishEditing}
         spellCheck="false"
         className="resize-none overflow-hidden border-none bg-transparent outline-none"
         style={{
