@@ -20,9 +20,9 @@ export default function PageLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { data: user, status } = useSession();
   const [isLoading, setIsLoading] = useAtom(projectLoadingAtom);
   const currentProject = useAtomValue(currentProjectAtom);
-  const { data: user, status } = useSession();
   const scaleFactor = useAtomValue(scaleFactorAtom); // 스케일 팩터 가져오기
   const [isScaleFactorVisible, setIsScaleFactorVisible] = useState(false);
 
@@ -41,7 +41,8 @@ export default function PageLayout({
   }, [scaleFactor]);
 
   useEffect(() => {
-    if (status !== "authenticated") return;
+    console.log(user);
+    if (!user) return;
 
     const projectId = currentProject?.uuid || projectIdinUrl;
     if (!projectId) return;

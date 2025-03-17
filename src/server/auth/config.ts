@@ -20,11 +20,6 @@ declare module "next-auth" {
       // role: UserRole;
     } & DefaultSession["user"];
   }
-
-  // interface User {
-  //   // ...other properties
-  //   // role: UserRole;
-  // }
 }
 
 /**
@@ -76,8 +71,13 @@ export const authConfig = {
   trustHost: true,
   adapter: PrismaAdapter(db),
   callbacks: {
-    async redirect({ url, baseUrl }) {
-      return "/dashboard/project";
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+      }
+      return token;
     },
     session: ({ session, token }) => ({
       ...session,
@@ -86,5 +86,13 @@ export const authConfig = {
         id: token.sub,
       },
     }),
+    async redirect({ url, baseUrl }) {
+      return `${baseUrl}/dashboard/project`;
+    },
+  },
+  // 페이지 설정 추가
+  pages: {
+    signIn: "/auth/signin",
+    // error: '/auth/error',
   },
 } satisfies NextAuthConfig;

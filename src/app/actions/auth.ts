@@ -19,9 +19,7 @@ export const authenticate = async (
     await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirect: true,
     });
-    return redirect("/dashboard/project");
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {

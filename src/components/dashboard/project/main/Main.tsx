@@ -11,8 +11,10 @@ import {
 import { Project } from "~/schemas";
 import { currentProjectAtom, isLoadingAtom, projectsAtom } from "~/store/atoms";
 import { IoMdSettings } from "react-icons/io";
+import { useSession } from "next-auth/react";
 
 const Main: React.FC = () => {
+  const { data: user, status } = useSession();
   const [projects, setProjects] = useAtom(projectsAtom);
   const setCurrentProject = useSetAtom(currentProjectAtom);
   const [loading, setLoading] = useState(true);
