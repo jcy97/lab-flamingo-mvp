@@ -18,18 +18,17 @@ export default function DashboardLayout({
 
   useEffect(() => {
     console.log("세션 상태:", status);
+    if (status === "loading") {
+      setIsLoading(true);
+    }
     if (status === "unauthenticated") {
       window.location.reload();
     }
-    // 세션 로딩 중일 때 전역 로딩 상태 활성화
-    if (status === "loading") {
-      setIsLoading(true);
-      return;
-    }
 
-    // 세션 로딩이 완료되면 로딩 상태 비활성화
-    setIsLoading(false);
-  }, [status, router, setIsLoading]);
+    if (status === "authenticated") {
+      setIsLoading(false);
+    }
+  }, [status, setIsLoading]);
 
   return (
     <>

@@ -78,6 +78,7 @@ model VerificationToken {
 model Project {
   id              Int       @id @default(autoincrement())
   uuid            String    @unique
+  url             String    @unique 
   name            String
   created_at      DateTime  @default(now())
   created_user_id String

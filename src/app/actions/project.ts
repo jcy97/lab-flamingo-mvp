@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "~/server/auth";
+import { nanoid } from "nanoid";
 import { v4 as uuidv4 } from "uuid";
 import { projectSchema, Project } from "~/schemas";
 import { ZodError } from "zod";
@@ -29,6 +30,7 @@ export const createProject = async (name: string) => {
     const projectData = {
       name,
       uuid: uuidv4(),
+      url: nanoid(),
       created_user_id: session.user.id,
       updated_user_id: session.user.id,
     };
@@ -58,6 +60,7 @@ export const createProject = async (name: string) => {
     const newProject: Project = {
       uuid: result.uuid,
       name: result.name,
+      url: result.url,
       created_at: result.created_at,
       created_user_id: result.created_user_id,
       updated_at: result.updated_at,
@@ -167,6 +170,7 @@ export const getUserProjects = async (): Promise<Project[]> => {
       ? projectUsers.map((projectUser) => ({
           uuid: projectUser.project.uuid,
           name: projectUser.project.name,
+          url: projectUser.project.url,
           created_at: projectUser.project.created_at,
           created_user_id: projectUser.project.created_user_id,
           updated_at: projectUser.project.updated_at,

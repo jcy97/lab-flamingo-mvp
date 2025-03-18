@@ -28,6 +28,7 @@ export const signInSchema = object({
 
 export const projectSchema = object({
   uuid: string(),
+  url: string(),
   name: string().min(3, "프로젝트명은 3자리 이상이어야 합니다"),
   created_at: date(),
   created_user_id: string(),

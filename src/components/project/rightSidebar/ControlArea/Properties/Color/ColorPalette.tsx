@@ -469,9 +469,9 @@ const ColorPalette: React.FC = () => {
       {/* 색상 모드 선택 탭 */}
       <div className="mb-4 flex border-b border-neutral-700">
         <button
-          className={`mr-2 px-3 py-1 text-xs ${
+          className={`mr-2 px-3 py-1 text-xs outline-none ${
             colorMode === "palette"
-              ? "border-b-2 border-blue-500 text-white"
+              ? "border-b-2 border-primary-500 text-white"
               : "text-gray-400 hover:text-white"
           }`}
           onClick={() => handleModeChange("palette")}
@@ -479,9 +479,9 @@ const ColorPalette: React.FC = () => {
           팔레트
         </button>
         <button
-          className={`px-3 py-1 text-xs ${
+          className={`px-3 py-1 text-xs outline-none ${
             colorMode === "slider"
-              ? "border-b-2 border-blue-500 text-white"
+              ? "border-b-2 border-primary-500 text-white"
               : "text-gray-400 hover:text-white"
           }`}
           onClick={() => handleModeChange("slider")}
@@ -575,7 +575,7 @@ const ColorPalette: React.FC = () => {
                   min="0"
                   max="100"
                   value={saturation}
-                  className="absolute h-3 w-full cursor-pointer appearance-none rounded-full bg-transparent"
+                  className="absolute h-3 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none"
                   onChange={(e) => {
                     const newS = Number(e.target.value);
                     setSaturation(newS);
@@ -615,7 +615,7 @@ const ColorPalette: React.FC = () => {
                   min="0"
                   max="100"
                   value={value}
-                  className="absolute h-3 w-full cursor-pointer appearance-none rounded-full bg-transparent"
+                  className="absolute h-3 w-full cursor-pointer appearance-none rounded-full bg-transparent outline-none"
                   onChange={(e) => {
                     setValue(Number(e.target.value));
                     setpalettePos({
