@@ -44,5 +44,7 @@ export const config = {
     "/signin",
     "/register",
     "/",
+    "/share",
+    "/share/:path*",
   ],
 };

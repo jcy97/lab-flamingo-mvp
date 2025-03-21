@@ -20,7 +20,7 @@ const ShareProjectModal: React.FC<Props> = ({ onClose, level }) => {
 
   // 전체 프로젝트 URL 생성
   const fullProjectUrl = currentProject?.url
-    ? `${baseUrl}/project/${currentProject.url}`
+    ? `${baseUrl}/share/${currentProject.url}`
     : "";
 
   // 클립보드에 URL 복사 함수

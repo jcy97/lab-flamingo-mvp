@@ -164,7 +164,7 @@ export const getUserProjects = async (): Promise<Project[]> => {
     // ProjectUser를 통해 사용자의 프로젝트 조회
     const projectUsers = await selectUserProjects(session.user.id);
     if (!projectUsers) return [];
-
+    console.log(projectUsers);
     // 프로젝트 정보 매핑
     return projectUsers.length > 0
       ? projectUsers.map((projectUser) => ({
