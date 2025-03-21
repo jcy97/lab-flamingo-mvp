@@ -247,7 +247,7 @@ export const checkAndAddProjectPermission = async (projectUuid: string) => {
       return {
         success: false,
         message: "로그인이 필요합니다.",
-        redirect: "/login",
+        redirect: "/signin",
       };
     }
 
