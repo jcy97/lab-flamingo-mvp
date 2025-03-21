@@ -1,4 +1,5 @@
 "use server";
+import { auth } from "../auth";
 import { db } from "../db";
 import { mongo } from "../mongo";
 
@@ -391,6 +392,120 @@ const deletePostgresData = async (projectUuid: string) => {
     return {
       success: false,
       error: `프로젝트 데이터 삭제 중 오류: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+};
+
+/**
+ * Project URL을 가지고 프로젝트 UUID 탐색
+ */
+
+export const selectProjectUuidByUrl = async (url: string) => {
+  try {
+    // URL을 사용하여 프로젝트 조회
+    const project = await db.project.findUnique({
+      where: { url },
+      select: { uuid: true },
+    });
+
+    return project ? project.uuid : null;
+  } catch (error) {
+    console.error("URL로 프로젝트 조회 중 오류:", error);
+    return null;
+  }
+};
+
+/**
+ * 사용자가 프로젝트에 대한 권한이 있는지 확인
+ *
+ * @param projectUuid - 프로젝트 UUID
+ * @param userId - 사용자 ID
+ * @returns 사용자의 프로젝트 권한 정보 또는 null
+ */
+export const checkProjectPermission = async (
+  projectUuid: string,
+  userId: string,
+) => {
+  try {
+    // 프로젝트 정보 조회
+    const project = await db.project.findUnique({
+      where: { uuid: projectUuid },
+      select: { id: true, name: true },
+    });
+
+    if (!project) {
+      return null;
+    }
+
+    // 사용자의 프로젝트 권한 확인
+    const userProjectPermission = await db.projectUser.findFirst({
+      where: {
+        project_id: project.id,
+        user_id: userId,
+      },
+      include: {
+        role: true,
+      },
+    });
+
+    return {
+      project,
+      permission: userProjectPermission,
+    };
+  } catch (error) {
+    console.error("프로젝트 권한 조회 중 오류:", error);
+    return null;
+  }
+};
+
+/**
+ * 사용자에게 프로젝트 멤버 권한 추가
+ *
+ * @param projectId - 프로젝트 ID (DB의 자동 증가 ID)
+ * @param userId - 사용자 ID
+ * @returns 성공 여부와 메시지
+ */
+export const addProjectMemberPermission = async (
+  projectId: number,
+  userId: string,
+) => {
+  try {
+    // MEMBER 역할 조회
+    const memberRole = await db.role.findFirst({
+      where: {
+        name: "MEMBER",
+        is_used: 1,
+      },
+    });
+
+    if (!memberRole) {
+      return {
+        success: false,
+        message: "MEMBER 역할을 찾을 수 없습니다.",
+      };
+    }
+
+    // 프로젝트 사용자 생성
+    await db.projectUser.create({
+      data: {
+        project_id: projectId,
+        user_id: userId,
+        role_id: memberRole.id,
+        created_user_id: userId,
+        updated_user_id: userId,
+      },
+    });
+
+    return {
+      success: true,
+      roleId: memberRole.id,
+      roleName: memberRole.name,
+    };
+  } catch (error) {
+    console.error("프로젝트 멤버 권한 추가 중 오류:", error);
+    return {
+      success: false,
+      message: "권한 추가 중 오류가 발생했습니다.",
     };
   }
 };

@@ -6,10 +6,13 @@ import { v4 as uuidv4 } from "uuid";
 import { projectSchema, Project } from "~/schemas";
 import { ZodError } from "zod";
 import {
+  addProjectMemberPermission,
+  checkProjectPermission,
   createProjectTransaction,
   createProjectWithDefaults,
   deleteProject,
   selectInitialProjectUrl,
+  selectProjectUuidByUrl,
   selectUserProjects,
   updateProjectName,
 } from "~/server/service/project";
@@ -164,7 +167,6 @@ export const getUserProjects = async (): Promise<Project[]> => {
     // ProjectUser를 통해 사용자의 프로젝트 조회
     const projectUsers = await selectUserProjects(session.user.id);
     if (!projectUsers) return [];
-    console.log(projectUsers);
     // 프로젝트 정보 매핑
     return projectUsers.length > 0
       ? projectUsers.map((projectUser) => ({
@@ -205,5 +207,101 @@ export const getInitialProjectUrl = async (projectId: string) => {
     return `/project/${result.project_id}/${result.page_id}/${result.canvas_id}`;
   } else {
     return null;
+  }
+};
+
+/**
+ * URL을 이용하여 프로젝트의 UUID를 찾는 함수
+ * @param {string} url - 프로젝트의 URL
+ * @returns {Promise<string | null>} 프로젝트의 UUID 또는 null (찾지 못한 경우)
+ */
+export const getProjectUuidByUrl = async (
+  url: string,
+): Promise<string | null> => {
+  if (!url) return null;
+
+  try {
+    // URL을 사용하여 프로젝트 조회
+    const project = await selectProjectUuidByUrl(url);
+
+    return project;
+  } catch (error) {
+    console.error("URL로 프로젝트 조회 중 오류:", error);
+    return null;
+  }
+};
+
+/**
+ * 사용자가 프로젝트에 대한 권한이 있는지 확인하고,
+ * 권한이 없을 경우 MEMBER 권한을 추가하는 액션 함수
+ *
+ * @param projectUuid - 프로젝트 UUID
+ * @returns 권한 확인 결과 객체
+ */
+export const checkAndAddProjectPermission = async (projectUuid: string) => {
+  const session = await auth();
+
+  try {
+    // 로그인 확인
+    if (!session?.user.id) {
+      return {
+        success: false,
+        message: "로그인이 필요합니다.",
+        redirect: "/login",
+      };
+    }
+
+    const userId = session.user.id;
+
+    // 프로젝트 권한 확인 (서비스 레이어 호출)
+    const permissionData = await checkProjectPermission(projectUuid, userId);
+
+    if (!permissionData) {
+      return {
+        success: false,
+        message: "프로젝트를 찾을 수 없습니다.",
+        redirect: "/dashboard",
+      };
+    }
+
+    const { project, permission } = permissionData;
+
+    // 이미 권한이 있는 경우
+    if (permission) {
+      return {
+        success: true,
+        message: `'${project.name}' 프로젝트에 접근합니다.`,
+        role: permission.role.name,
+        isOwner: permission.role.name === "OWNER",
+      };
+    }
+
+    // 권한이 없는 경우 MEMBER 권한 추가 (서비스 레이어 호출)
+    const addPermissionResult = await addProjectMemberPermission(
+      project.id,
+      userId,
+    );
+
+    if (!addPermissionResult.success) {
+      return {
+        success: false,
+        message:
+          addPermissionResult.message || "권한 추가 중 오류가 발생했습니다.",
+      };
+    }
+
+    return {
+      success: true,
+      message: `'${project.name}' 프로젝트에 MEMBER로 추가되었습니다.`,
+      role: addPermissionResult.roleName,
+      isOwner: false,
+      isNewMember: true,
+    };
+  } catch (error) {
+    console.error("프로젝트 권한 검사 중 오류:", error);
+    return {
+      success: false,
+      message: "권한 확인 중 오류가 발생했습니다.",
+    };
   }
 };
