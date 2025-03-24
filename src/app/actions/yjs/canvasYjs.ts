@@ -158,6 +158,7 @@ export const initCanvasesMap = (canvases: CanvasWithLayers[]) => {
 };
 
 // 캔버스 변경 감지 설정 함수
+// 캔버스 변경 감지 설정 함수
 export const observeCanvasChanges = () => {
   const ydoc = getCanvasYdoc();
   if (!ydoc) return;
@@ -182,12 +183,6 @@ export const observeCanvasChanges = () => {
 
         // 새로 추가된 캔버스가 있을 경우
         if (canvas) {
-          // 기존 레이어 관찰자가 없는지 확인을 위한 플래그 변수 (코드 내에서 관리)
-
-          // YDoc에 관찰자 상태를 저장할 수 있는 맵이 없으므로
-          // 여기서는 매번 레이어 맵 관찰을 설정하는 방식으로 수정
-          // 이미 관찰 중이어도 observeLayerChanges가 중복 호출되어도 문제가 없도록 수정 필요
-
           // 레이어 맵 초기화 (이미 존재하는 경우 덮어쓰지 않음)
           const layersMap = ydoc.getMap<any>(`layers-${canvasIdStr}`);
 
@@ -240,28 +235,45 @@ export const observeCanvasChanges = () => {
       store.set(canvasLayersAtom, updatedCanvasLayers);
     }
 
+    // 페이지별 캔버스 그룹화 로직 추가
+    // 모든 업데이트된 캔버스를 페이지별로 그룹화
+    const canvasesByPage: Record<string, CanvasWithLayers[]> = {};
+    updatedCanvases.forEach((canvas) => {
+      if (!canvasesByPage[canvas.page_id]) {
+        canvasesByPage[canvas.page_id] = [];
+      }
+      canvasesByPage[canvas.page_id]?.push(canvas);
+    });
+
+    // 페이지별 캔버스 업데이트
+    const pageCanvases = store.get(pageCanvasesAtom);
+    const updatedPageCanvases: Record<string, CanvasWithLayers[]> = {
+      ...pageCanvases,
+    };
+
+    // 각 페이지별로 캔버스 업데이트
+    Object.keys(canvasesByPage).forEach((pageId) => {
+      // 페이지별 캔버스를 정렬
+      const sortedPageCanvases = canvasesByPage[pageId]?.sort(
+        (a, b) => a.index - b.index,
+      );
+      updatedPageCanvases[pageId] = sortedPageCanvases!;
+    });
+
+    // pageCanvasesAtom 업데이트 - 모든 페이지에 대해 한 번에 적용
+    store.set(pageCanvasesAtom, updatedPageCanvases);
+
     // 현재 선택된 페이지 정보 가져오기
     const currentPage = store.get(currentPageAtom);
 
     if (currentPage) {
       const currentPageId = currentPage.id;
-      // 현재 페이지의 캔버스만 필터링
-      const currentPageCanvases = updatedCanvases.filter(
-        (canvas) => canvas.page_id === currentPageId,
-      );
+      // 현재 페이지의 캔버스만 필터링 (업데이트된 페이지 캔버스 맵에서 가져옴)
+      const currentPageCanvases = updatedPageCanvases[currentPageId] || [];
 
       if (currentPageCanvases.length > 0) {
         // 현재 페이지의 캔버스 리스트 업데이트
         store.set(currentCanvasesAtom, currentPageCanvases);
-
-        // pageCanvasesAtom 업데이트 (현재 페이지의 캔버스만 업데이트)
-        const pageCanvases = store.get(pageCanvasesAtom);
-
-        // 페이지 ID에 해당하는 캔버스 목록 업데이트
-        store.set(pageCanvasesAtom, {
-          ...pageCanvases,
-          [currentPageId]: currentPageCanvases,
-        });
       }
     }
 
