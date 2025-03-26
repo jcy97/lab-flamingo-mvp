@@ -1,5 +1,5 @@
 "use client";
-import { useAtomValue, useAtom } from "jotai";
+import { useAtomValue, useAtom, useSetAtom } from "jotai";
 import { useEffect, useState, useRef } from "react";
 import {
   currentCanvasAtom,
@@ -13,7 +13,8 @@ import {
   LayerWithContents,
   canvasLayersAtom,
   editingTextLayerIdAtom,
-  editingTextLayerAtom, // 트랜스포머 표시 상태 atom
+  editingTextLayerAtom,
+  stageRefAtom, // 트랜스포머 표시 상태 atom
 } from "~/store/atoms";
 import { Stage, Layer, Rect } from "react-konva";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
@@ -93,6 +94,8 @@ const Canvas: React.FC = () => {
   const stageRef = useRef<Konva.Stage | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  const setStageRef = useSetAtom(stageRefAtom);
+
   // 트랜스포머 관련 상태
   const transformerRef = useRef<Konva.Transformer | null>(null);
   const [isClickInsideTransformer, setIsClickInsideTransformer] =
@@ -112,6 +115,17 @@ const Canvas: React.FC = () => {
   const [editingTextLayerId, setEditingTextLayerId] = useAtom(
     editingTextLayerIdAtom,
   );
+
+  useEffect(() => {
+    // stageRef 자체(RefObject)를 저장
+    setStageRef(stageRef);
+
+    return () => {
+      // 컴포넌트 언마운트 시 참조 초기화
+      setStageRef(null);
+    };
+  }, [stageRef, setStageRef]);
+
   // 노드 드래그 이벤트 감지
   useEffect(() => {
     if (stageRef.current) {

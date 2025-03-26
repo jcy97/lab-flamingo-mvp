@@ -1,8 +1,11 @@
+"use client";
 import { MdOutlineDevicesFold } from "react-icons/md";
 import React, { useRef, useState, useEffect } from "react";
 import PopupPortal from "~/components/common/PopupPotal";
-import { FaHome, FaCog, FaSignOutAlt } from "react-icons/fa";
+import { FaHome, FaRegSave, FaSignOutAlt } from "react-icons/fa";
 import { useRouter } from "next/navigation";
+import { useAtomValue } from "jotai";
+import { currentCanvasAtom, stageRefAtom } from "~/store/atoms";
 
 const Header: React.FC = () => {
   // 메뉴 상태 관리
@@ -11,6 +14,10 @@ const Header: React.FC = () => {
   const menuRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
+
+  // 스테이지 참조와 현재 캔버스 가져오기
+  const stageRef = useAtomValue(stageRefAtom);
+  const currentCanvas = useAtomValue(currentCanvasAtom);
 
   // 로고 클릭 핸들러
   const handleLogoClick = (e: React.MouseEvent) => {
@@ -41,14 +48,57 @@ const Header: React.FC = () => {
         // 홈으로 이동 로직
         router.push("/dashboard/project");
         break;
-      case "settings":
-        // 설정 페이지로 이동 로직
-        break;
-      case "logout":
-        // 로그아웃 로직
+      case "save":
+        // 이미지 저장 로직
+        exportCanvasToImage();
         break;
       default:
         break;
+    }
+  };
+
+  // 캔버스를 이미지로 내보내는 함수
+  const exportCanvasToImage = () => {
+    if (!stageRef || !stageRef.current || !currentCanvas) {
+      console.error("스테이지 또는 캔버스가 준비되지 않았습니다.");
+      return;
+    }
+
+    try {
+      const stage = stageRef.current;
+
+      // 현재 스케일 저장
+      const currentScale = {
+        x: stage.scaleX(),
+        y: stage.scaleY(),
+      };
+
+      // 스케일을 1로 설정하여 원본 크기로 내보내기
+      stage.scale({ x: 1, y: 1 });
+
+      // 고품질 PNG로 내보내기 (pixelRatio를 3으로 설정하여 고화질)
+      const dataURL = stage.toDataURL({
+        pixelRatio: 3,
+        mimeType: "image/png",
+        quality: 1,
+        width: currentCanvas.width,
+        height: currentCanvas.height,
+      });
+
+      // 원래 스케일로 복원
+      stage.scale(currentScale);
+
+      // 다운로드 링크 생성
+      const link = document.createElement("a");
+      link.download = `${currentCanvas.name || "캔버스"}_export.png`;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      console.log("이미지가 성공적으로 내보내졌습니다.");
+    } catch (error) {
+      console.error("이미지 내보내기 중 오류 발생:", error);
     }
   };
 
@@ -105,20 +155,13 @@ const Header: React.FC = () => {
                 <FaHome size={16} />
                 <span>홈으로</span>
               </button>
-              {/* <button
-                className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
-                onClick={() => handleMenuItemClick("settings")}
-              >
-                <FaCog size={16} />
-                <span>설정</span>
-              </button>
               <button
-                className="flex items-center gap-2 px-3 py-2 text-left text-sm text-red-400 hover:bg-neutral-700"
-                onClick={() => handleMenuItemClick("logout")}
+                className="flex items-center gap-2 px-3 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-700"
+                onClick={() => handleMenuItemClick("save")}
               >
-                <FaSignOutAlt size={16} />
-                <span>로그아웃</span>
-              </button> */}
+                <FaRegSave size={16} />
+                <span>이미지 저장</span>
+              </button>
             </div>
           </div>
         )}

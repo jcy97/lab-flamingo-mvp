@@ -5,6 +5,7 @@ import { CurrentConnectedUser } from "~/types/types";
 import { ToolbarItemIDs } from "~/constants/toolbarItems";
 import Konva from "konva";
 import { FOCUS_AREA } from "~/constants/focus";
+import { RefObject } from "react";
 
 export type PageWithCanvases = Page & {
   page_canvases: CanvasWithLayers[];
@@ -17,7 +18,8 @@ export type LayerWithContents = Layer & {
 };
 // 전역 로딩 상태 관리
 export const isLoadingAtom = atom<Boolean>(false);
-
+// 전역 캔버스
+export const stageRefAtom = atom<RefObject<Konva.Stage> | null>(null);
 // 스케일 팩터
 export const scaleFactorAtom = atom(1);
 
